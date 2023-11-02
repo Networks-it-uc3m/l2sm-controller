@@ -30,8 +30,6 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An intent compiler for {@link org.idco.net.VirtualLinkIntent}.
@@ -39,7 +37,6 @@ import org.slf4j.LoggerFactory;
 @Component(immediate = true)
 public class VirtualLinkIntentCompiler implements IntentCompiler<VirtualLinkIntent> {
 
-        private final Logger log = LoggerFactory.getLogger(getClass());
 
         @Reference(cardinality = ReferenceCardinality.MANDATORY)
         protected PathService pathService;
