@@ -32,31 +32,9 @@ public class RESTExceptionMapper implements ExceptionMapper<Exception> {
 
         Status status = null;
 
-        switch (exception.getCode()) {
-            case DOMAIN_NOT_REGISTERED:
-                status = Status.BAD_REQUEST;
-                break;
-            case NOT_FOUND:
-                status = Status.NOT_FOUND;
-                break;
-            case NOT_SUPPORTED:
-                status = Status.BAD_REQUEST;
-                break;
-            case NO_PORT_AVAILABLE:
-                status = Status.BAD_REQUEST;
-                break;
-            case NO_TUNNEL_ID_AVAILABLE:
-                status = Status.BAD_REQUEST;
-                break;
-            case DEVICE_NOT_FOUND:
-                status = Status.BAD_REQUEST;
-                break;
-            default:
-                break;
 
-        }
 
-        ErrorResponse errorResponse = new ErrorResponse(exception.getCode().name(), exception.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(exception.toString(), exception.getMessage());
 
         return Response.status(status).entity(errorResponse).build();
     }
