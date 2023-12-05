@@ -157,7 +157,7 @@ public class IDCODatabase {
             return Collections.emptySet();
         }
         Network network = networks.get(networkId);
-        return network.networkEndpoints.stream().filter(p -> p.equals(heardPort)).collect(Collectors.toSet());
+        return network.networkEndpoints.stream().filter(p -> !p.equals(heardPort)).collect(Collectors.toSet());
     }
 
     
