@@ -1,4 +1,4 @@
-package org.l2smController.net;
+package org.l2sm.net;
 
 import java.util.Collection;
 import java.util.HashMap;

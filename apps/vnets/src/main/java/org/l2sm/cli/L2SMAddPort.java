@@ -1,31 +1,28 @@
-package org.l2smController.cli;
+package org.l2sm.cli;
 
 import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.l2smController.api.IDCOService;
-import org.l2smController.api.Network;
+import org.l2sm.api.IDCOService;
 import org.onosproject.cli.AbstractShellCommand;
+import org.onosproject.net.ConnectPoint;
 
 @Service
-@Command(scope = "onos", name = "l2sm-get-network", description = "Create a network")
+@Command(scope = "onos", name = "l2sm-add-port", description = "Add a port to an existing network")
 
-
-public class L2SMGetNetwork extends AbstractShellCommand {
+public class L2SMAddPort extends AbstractShellCommand {
 
     @Argument(index = 0, name = "networkId", description = "networkId", required = true, multiValued = false)
     String networkId = null;
+
+    @Argument(index = 1, name = "networkEndpoint", description = "networkEndpoint", required = true, multiValued = false)
+    String networkEndpoint = null;
 
     @Override
     protected void doExecute() {
         IDCOService idcoService = get(IDCOService.class);
         try {
-            Network network = idcoService.getVirtualNetwork(networkId);
-            if (network == null){
-                print("The network does not exist");
-                return;
-            }
-            print(network.toString());
+            idcoService.addPort(networkId, ConnectPoint.deviceConnectPoint(networkEndpoint));
         } catch (Exception e) {
             print("Error ocurred");
             print(e.toString());

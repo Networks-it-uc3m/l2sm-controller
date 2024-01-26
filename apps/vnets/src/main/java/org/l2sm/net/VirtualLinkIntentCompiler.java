@@ -1,5 +1,5 @@
 
-package org.l2smController.net;
+package org.l2sm.net;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 
 /**
- * An intent compiler for {@link org.l2smController.net.VirtualLinkIntent}.
+ * An intent compiler for {@link org.l2sm.net.VirtualLinkIntent}.
  */
 @Component(immediate = true)
 public class VirtualLinkIntentCompiler implements IntentCompiler<VirtualLinkIntent> {

@@ -1,4 +1,4 @@
-package org.l2smController.app;
+package org.l2sm.app;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -11,7 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import java.util.stream.Collectors;
 
-import org.l2smController.api.Network;
+import org.l2sm.api.Network;
 import org.onlab.packet.MacAddress;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.intent.Key;

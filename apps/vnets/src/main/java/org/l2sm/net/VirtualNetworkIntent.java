@@ -1,4 +1,4 @@
-package org.l2smController.net;
+package org.l2sm.net;
 
 import java.util.Collections;
 
@@ -11,12 +11,11 @@ import org.onosproject.net.intent.Key;
 import com.google.common.base.MoreObjects;
 
 //Based on the TwoWayP2PIntent class
-public class VirtualLinkIntent extends Intent {
+public class VirtualNetworkIntent extends Intent {
 
     // Protected so that the serializer is able to access them
-    ConnectPoint one;
-    ConnectPoint two;
-    long tunnelId;
+    ConnectPoint[] connectPoints;
+    long[] tunnelIds;
 
     /**
      * Returns a new virtual link builder.
@@ -31,7 +30,7 @@ public class VirtualLinkIntent extends Intent {
      * @return virtual link intent builder
      */
 
-    public static VirtualLinkIntent.Builder builder() {
+    public static VirtualNetworkIntent.Builder builder() {
         return new Builder();
     }
 
@@ -40,9 +39,8 @@ public class VirtualLinkIntent extends Intent {
      */
     public static final class Builder extends Intent.Builder {
 
-        ConnectPoint one = null;
-        ConnectPoint two = null;
-        long tunnelId = -1;
+        ConnectPoint[] connectPoints;
+        long[] tunnelIds;
 
         private Builder() {
             // Hide constructor
@@ -69,19 +67,8 @@ public class VirtualLinkIntent extends Intent {
          * @param one connect point
          * @return this builder
          */
-        public Builder one(ConnectPoint one) {
-            this.one = one;
-            return this;
-        }
-
-        /**
-         * Sets one of the ports of the virtual link
-         *
-         * @param two connect point
-         * @return this builder
-         */
-        public Builder two(ConnectPoint two) {
-            this.two = two;
+        public Builder connectPoints(ConnectPoint[] connectPoints) {
+            this.connectPoints = connectPoints;
             return this;
         }
 
@@ -94,8 +81,8 @@ public class VirtualLinkIntent extends Intent {
          * @param tunnelId tunnel ID of the tunnel
          * @return this builder
          */
-        public Builder tunnelID(long tunnelId) {
-            this.tunnelId = tunnelId;
+        public Builder tunnelIDs(long[] tunnelIds) {
+            this.tunnelIds = tunnelIds;
             return this;
         }
 
@@ -104,13 +91,12 @@ public class VirtualLinkIntent extends Intent {
          *
          * @return virtual link intent
          */
-        public VirtualLinkIntent build() {
-            return new VirtualLinkIntent(
+        public VirtualNetworkIntent build() {
+            return new VirtualNetworkIntent(
                     appId,
                     key,
-                    one,
-                    two,
-                    tunnelId,
+                    connectPoints,
+                    tunnelIds,
                     priority,
                     resourceGroup);
         }
@@ -120,11 +106,10 @@ public class VirtualLinkIntent extends Intent {
      * Creates a new virtual link intent. Not for public use
      * and should only be accesed by the virtual link intent builder
      */
-    private VirtualLinkIntent(ApplicationId appId,
+    private VirtualNetworkIntent(ApplicationId appId,
             Key key,
-            ConnectPoint one,
-            ConnectPoint two,
-            Long tunnelId,
+            ConnectPoint[] connectPoints,
+            long[] tunnelIds,
             int priority,
             ResourceGroup resourceGroup) {
         super(appId,
@@ -133,36 +118,20 @@ public class VirtualLinkIntent extends Intent {
                 priority,
                 resourceGroup);
 
-        this.one = one;
-        this.two = two;
-        this.tunnelId = tunnelId;
+        this.connectPoints = connectPoints;
+        this.tunnelIds = tunnelIds;
     }
 
     // Constructor for serializer.
 
-    protected VirtualLinkIntent() {
+    protected VirtualNetworkIntent() {
         super();
-        this.one = null;
-        this.two = null;
-        this.tunnelId = -1;
+        this.connectPoints = null;
+        this.tunnelIds = null;
     }
 
-    /**
-     * Returns one of the ports of the virtual link
-     *
-     * @return one of the ports
-     */
-    public ConnectPoint one() {
-        return one;
-    }
-
-    /**
-     * Returns two of the ports of the virtual link
-     *
-     * @return one of the ports
-     */
-    public ConnectPoint two() {
-        return two;
+    public ConnectPoint[] connectPoints() {
+        return this.connectPoints;
     }
 
     /**
@@ -170,8 +139,8 @@ public class VirtualLinkIntent extends Intent {
      *
      * @return tunnel id
      */
-    public long tunnelId() {
-        return tunnelId;
+    public long[] tunnelIds() {
+        return this.tunnelIds;
     }
 
     @Override
@@ -182,9 +151,7 @@ public class VirtualLinkIntent extends Intent {
                 .add("appId", appId())
                 .add("priority", priority())
                 .add("resources", resources())
-                .add("one", one())
-                .add("two", two())
-                .add("tunnelID", tunnelId())
+                .add("tunnelIDs", tunnelIds())
                 .add("resourceGroup", resourceGroup())
                 .toString();
     }

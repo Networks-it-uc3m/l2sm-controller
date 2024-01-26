@@ -1,4 +1,4 @@
-package org.l2smController.dto;
+package org.l2sm.dto;
 
 import java.util.ArrayList;
 

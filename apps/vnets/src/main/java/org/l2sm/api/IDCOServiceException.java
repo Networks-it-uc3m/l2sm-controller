@@ -1,4 +1,4 @@
-package org.l2smController.api;
+package org.l2sm.api;
 
 public class IDCOServiceException extends Exception{
 

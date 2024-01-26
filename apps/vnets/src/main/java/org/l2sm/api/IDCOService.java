@@ -1,4 +1,4 @@
-package org.l2smController.api;
+package org.l2sm.api;
 
 import org.onosproject.net.ConnectPoint;
 

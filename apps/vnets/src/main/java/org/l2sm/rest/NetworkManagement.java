@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.l2smController.rest;
+package org.l2sm.rest;
 
 
 import javax.ws.rs.Consumes;
@@ -28,10 +28,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.l2smController.api.IDCOService;
-import org.l2smController.api.IDCOServiceException;
-import org.l2smController.api.Network;
-import org.l2smController.dto.NetworkDTO;
+import org.l2sm.api.IDCOService;
+import org.l2sm.api.IDCOServiceException;
+import org.l2sm.api.Network;
+import org.l2sm.dto.NetworkDTO;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.rest.AbstractWebResource;
 

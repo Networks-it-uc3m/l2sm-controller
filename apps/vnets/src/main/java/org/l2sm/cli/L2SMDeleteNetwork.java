@@ -1,16 +1,15 @@
-package org.l2smController.cli;
+package org.l2sm.cli;
 
 import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.l2smController.api.IDCOService;
+import org.l2sm.api.IDCOService;
 import org.onosproject.cli.AbstractShellCommand;
 
 @Service
-@Command(scope = "onos", name = "l2sm-create-network", description = "Create a network")
+@Command(scope = "onos", name = "l2sm-delete-network", description = "Delete a network")
 
-
-public class L2SMCreateNetwork extends AbstractShellCommand {
+public class L2SMDeleteNetwork extends AbstractShellCommand {
 
     @Argument(index = 0, name = "networkId", description = "networkId", required = true, multiValued = false)
     String networkId = null;
@@ -19,7 +18,7 @@ public class L2SMCreateNetwork extends AbstractShellCommand {
     protected void doExecute() {
         IDCOService idcoService = get(IDCOService.class);
         try {
-            idcoService.createVirtualNetwork(networkId);
+            idcoService.deleteVirtualNetwork(networkId);
         } catch (Exception e) {
             print("Error ocurred");
             print(e.toString());

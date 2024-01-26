@@ -1,4 +1,4 @@
-package org.l2smController.api;
+package org.l2sm.api;
 
 import java.util.ArrayList;
 import java.util.List;

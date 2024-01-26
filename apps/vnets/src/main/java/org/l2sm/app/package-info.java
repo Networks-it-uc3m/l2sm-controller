@@ -17,4 +17,4 @@
 /**
  * ONOS application archetype.
  */
-package org.l2smController.api;
+package org.l2sm.app;

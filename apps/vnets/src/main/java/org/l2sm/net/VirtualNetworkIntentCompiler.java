@@ -1,5 +1,5 @@
 
-package org.l2smController.net;
+package org.l2sm.net;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An intent compiler for {@link org.l2smController.net.VirtualLinkIntent}.
+ * An intent compiler for {@link org.l2sm.net.VirtualLinkIntent}.
  */
 @Component(immediate = true)
 public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetworkIntent> {

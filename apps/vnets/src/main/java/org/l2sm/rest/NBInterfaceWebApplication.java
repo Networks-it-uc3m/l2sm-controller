@@ -1,4 +1,4 @@
-package org.l2smController.rest;
+package org.l2sm.rest;
 
 import org.onlab.rest.AbstractWebApplication;
 
