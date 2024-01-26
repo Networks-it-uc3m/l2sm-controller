@@ -23,26 +23,26 @@
     <version>2.7.0</version>
   </parent>
 
-  <groupId>org.l2smController</groupId>
-  <artifactId>l2sm-controller-app</artifactId>
+  <groupId>org.l2sm</groupId>
+  <artifactId>vnets</artifactId>
   <version>1.0</version>
   <packaging>bundle</packaging>
 
   <description>L2SM SDN solution</description>
-  <url>http://www.uc3m.es</url>
+  <url>https://github.com/Networks-it-uc3m</url>
 
   <properties>
-    <onos.app.name>org.l2smController.app</onos.app.name>
+    <onos.app.name>org.l2sm.vnets</onos.app.name>
     <api.version>1.0.0</api.version>
-    <onos.app.title>L2S-M Controller App.</onos.app.title>
+    <onos.app.title>L2S-M Controller Vnets app.</onos.app.title>
     <onos.app.origin>UC3M</onos.app.origin>
     <onos.app.category>default</onos.app.category>
-    <onos.app.url>https://www.uc3m.es</onos.app.url>
+    <onos.app.url>https://github.com/Networks-it-uc3m</onos.app.url>
     <api.description>L2S-M Controller REST API to create or delete virtual networks</api.description>
-    <web.context>/onos/v1/l2sm</web.context>
-    <api.title>L2S-M Controller REST API</api.title>
-    <api.package>org.l2smController.rest</api.package>
-    <onos.app.readme>L2S-M Controller application</onos.app.readme>
+    <web.context>/onos/vnets</web.context>
+    <api.title>L2S-M Controller Vnets REST API</api.title>
+    <api.package>org.l2sm.vnets</api.package>
+    <onos.app.readme>L2S-M Controller Vnets application</onos.app.readme>
   </properties>
 
   <dependencies>
@@ -171,7 +171,7 @@
         <artifactId>maven-bundle-plugin</artifactId>
         <configuration>
           <instructions>
-            <Karaf-Commands>org.l2smController.cli</Karaf-Commands>
+            <Karaf-Commands>org.l2sm.vnets</Karaf-Commands>
             <_wab>src/main/webapp/</_wab>
             <Include-Resource>WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
                             {maven-resources}</Include-Resource>

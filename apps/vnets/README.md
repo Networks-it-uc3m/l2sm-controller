@@ -17,7 +17,7 @@ Get an ONOS v2.7.x instance and install the oar (idco-app-1.0.oar in this reposi
 To install an oar file in ONOS, follow the official documentation. The easiest way is to login through the web GUI, go to applications, and upload the file. 
 
 ### Connecting the L2S-M switches
-The switches must be connected to the IDCO throught the OpenFlow 1.3 protocol. There is no specific requirement for the port names. The VXLAN tunnels must be created inside the OvSs with the options:key=flow  option set (see example in https://docs.openvswitch.org/en/latest/faq/vxlan/).
+The switches must be connected to the IDCO throught the OpenFlow 1.3 protocol. There is no specific requirement for the port names. The VXLAN tunnels must be created inside the OvSs with the options:key=flow option set (see example in https://docs.openvswitch.org/en/latest/faq/vxlan/).
 
 ## Usage
 This application currently provides 3 commands: l2sm-create-network, l2sm-add-port, l2sm-get-network and l2sm-delete-network. This commands must be executed in the ONOS karaf CLI.
@@ -25,16 +25,16 @@ This application currently provides 3 commands: l2sm-create-network, l2sm-add-po
 #### Example of how it could be used with L2S-M
 L2SM notices a new network has been created called "austria" (new network attachment definition). Subsequently, it sends the create command to the IDCO. A new network with 0 points will be created:
 
-![alt text](example_images/1.png)
+![alt text](../../assets/1.png)
 
 
 When a new VNF joins the "austria" network, the L2S-M connects it to the L2S-M switch through a veth pair. At that point, the L2S-M should have a way to know the name of the port of the switch the veth has been connected to (name = openflow switch id + openflow port number). After getting this information, it can send an add-port command to the IDCO to add that port to the network:
 
-![alt text](example_images/2.png)
+![alt text](../../assets/2.png)
 
 When other VNFs join the network, the same command must be used to add them to the network:
 
-![alt text](example_images/3.png)
+![alt text](../../assets/3.png)
 
 Every time a new port is added to a network, the IDCO will make sure the needed flow rules are installed in the switches to connect those ports (in the images below, it is shown how the IDCO assigns a random VNI to each port that is used to forward traffics from and to it). These rules are the same as those used in the original IDCO, meaning:
 
