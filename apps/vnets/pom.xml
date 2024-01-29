@@ -24,7 +24,7 @@
   </parent>
 
   <groupId>org.l2sm</groupId>
-  <artifactId>vnets</artifactId>
+  <artifactId>vnets-app</artifactId>
   <version>1.0</version>
   <packaging>bundle</packaging>
 
@@ -41,7 +41,7 @@
     <api.description>L2S-M Controller REST API to create or delete virtual networks</api.description>
     <web.context>/onos/vnets</web.context>
     <api.title>L2S-M Controller Vnets REST API</api.title>
-    <api.package>org.l2sm.vnets</api.package>
+    <api.package>org.l2sm.rest</api.package>
     <onos.app.readme>L2S-M Controller Vnets application</onos.app.readme>
   </properties>
 
@@ -171,7 +171,7 @@
         <artifactId>maven-bundle-plugin</artifactId>
         <configuration>
           <instructions>
-            <Karaf-Commands>org.l2sm.vnets</Karaf-Commands>
+            <Karaf-Commands>org.l2sm.cli</Karaf-Commands>
             <_wab>src/main/webapp/</_wab>
             <Include-Resource>WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
                             {maven-resources}</Include-Resource>
