@@ -27,15 +27,15 @@ The core functionality of L2S-M, including its architecture and implementation d
 To set up the L2S-M Controller with ONOS, follow the steps below:
 
 1. **Clone Repository:**
-  ```bash
-    git clone https://github.com/Networks-it-uc3m/l2sm-controller
-    cd l2sm-controller
-    ```
+```bash
+git clone https://github.com/Networks-it-uc3m/l2sm-controller
+cd l2sm-controller
+```
 
 2. **Compile and Install Applications:**
-    ```bash
-    mvn clean install
-    ```
+```bash
+mvn clean install
+```
 
 3. **Install vnets and vlinks on ONOS:**
 
@@ -43,10 +43,10 @@ This component is meant to be run in a k8s Cluster as its shown in the [L2S-M cu
 
 When using these apps locally you may run an ONOS instance and install this applications by doing the following commands:
 
-    ```bash
-    onos-app <onos-ip> install! vnet-1-0.oar
-    onos-app <onos-ip> install! vlink-1-0.oar
-    ```
+```bash
+onos-app <onos-ip> install! vnet-1-0.oar
+onos-app <onos-ip> install! vlink-1-0.oar
+```
 
 
 ## Developing for L2S-M Controller
