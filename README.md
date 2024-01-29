@@ -10,7 +10,7 @@ L2S-M is a K8s networking solution designed to complement the Container Network 
 
 - **On-Demand Virtual Networks (vnet)**: Allows the creation and deletion of virtual networks on-demand, specifying the pods that will be connected.
 
-- **Virtual Link Creation (vlink)**: Creates a virtual link between two pods, specifying a path for configuration.
+- **Virtual Link Creation (vlink)**: Creates a virtual link between two pods. As a differentiated feauture with respect to a *vnet*, a *vlink* can be bidirectional or unidirectional. Additionally, a path on the L2S-M network overlay can be specified for the traffic transimitted on each direction of a *vlink*.
 
 - **Isolated Connectivity**: Workloads (pods) within a K8s cluster can have isolated link-layer connectivity with other pods.
 
