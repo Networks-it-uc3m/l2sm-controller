@@ -18,14 +18,15 @@ public class L2SMVLinkGetNetwork extends AbstractShellCommand {
 
     @Override
     protected void doExecute() {
+        print("Getting network");
         IDCOVLinkService idcoVlinkService = get(IDCOVLinkService.class);
         try {
-            VLinkNetwork networkVlink = idcoVlinkService.getVLinkNetwork(networkVlinkId);
+           VLinkNetwork networkVlink = idcoVlinkService.getVLinkNetwork(networkVlinkId);
             if (networkVlink == null){
                 print("The network does not exist");
                 return;
             }
-            print(networkVlink.toString());
+           print(networkVlink.toString());
         } catch (Exception e) {
             print("Error ocurred");
             print(e.toString());

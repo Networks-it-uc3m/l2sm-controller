@@ -38,7 +38,7 @@
     <onos.app.title>L2S-M Controller Vlinks app</onos.app.title>
     <onos.app.origin>UC3M</onos.app.origin>
     <onos.app.category>default</onos.app.category>
-    <api.package>org.l2sm.vlinks</api.package>
+    <api.package>org.l2sm.vlinks.api</api.package>
     <onos.app.url>https://github.com/Networks-it-uc3m</onos.app.url>
     <api.title>L2S-M Controller Vlinks REST API</api.title>
     <onos.app.readme>2S-M Controller Vlinks application</onos.app.readme>
@@ -93,6 +93,8 @@
       <scope>provided</scope>
     </dependency>
 
+ 
+    
     <dependency>
       <groupId>org.onosproject</groupId>
       <artifactId>onos-cli</artifactId>
@@ -118,6 +120,7 @@
       <version>${onos.version}</version>
       <scope>provided</scope>
     </dependency>
+
 
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -169,7 +172,7 @@
             <_wab>src/main/webapp/</_wab>
             <Include-Resource>WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
                           {maven-resources}</Include-Resource>
-            <Import-Package>*,org.glassfish.jersey.servlet</Import-Package>
+            <Import-Package>*,!com.fasterxml.jackson.dataformat,!snakeyaml,org.glassfish.jersey.servlet</Import-Package>
             <Web-ContextPath>${web.context}</Web-ContextPath>
             <Karaf-Commands>org.l2sm.vlinks.cli</Karaf-Commands>
           </instructions>

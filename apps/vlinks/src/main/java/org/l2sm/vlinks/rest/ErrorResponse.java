@@ -1,22 +1,22 @@
-package org.l2sm.vlinks.rest;
+// package org.l2sm.vlinks.rest;
 
-public class ErrorResponse {
+// public class ErrorResponse {
 
-    protected String errorCode;
-    protected String errorDescription;
+//     protected String errorCode;
+//     protected String errorDescription;
 
 
-    public ErrorResponse (String error_code, String error_description){
-        this.errorCode = error_code;
-        this.errorDescription = error_description;
-    }
+//     public ErrorResponse (String error_code, String error_description){
+//         this.errorCode = error_code;
+//         this.errorDescription = error_description;
+//     }
 
-    public String getErrorCode(){
-        return errorCode;
-    }
+//     public String getErrorCode(){
+//         return errorCode;
+//     }
 
-    public String getErrorDescription(){
-        return errorDescription;
-    }
+//     public String getErrorDescription(){
+//         return errorDescription;
+//     }
     
-}
+// }
