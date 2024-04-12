@@ -32,7 +32,7 @@ import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 
 /**
- * An intent compiler for {@link org.l2sm.net.VirtualLinkIntent}.
+ * An intent compiler for {@link org.l2sm.vnets.net.VirtualLinkIntent}.
  */
 @Component(immediate = true)
 public class VirtualLinkIntentCompiler implements IntentCompiler<VirtualLinkIntent> {

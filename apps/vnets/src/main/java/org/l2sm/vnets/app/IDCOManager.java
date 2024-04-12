@@ -14,11 +14,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.l2sm.api.IDCOService;
-import org.l2sm.api.IDCOServiceException;
-import org.l2sm.api.Network;
-import org.l2sm.net.VirtualLinkIntent;
-import org.l2sm.net.VirtualNetworkIntent;
+import org.l2sm.vnets.api.IDCOService;
+import org.l2sm.vnets.api.IDCOServiceException;
+import org.l2sm.vnets.api.Network;
+import org.l2sm.vnets.net.VirtualLinkIntent;
+import org.l2sm.vnets.net.VirtualNetworkIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
@@ -103,7 +103,7 @@ public class IDCOManager implements IDCOService {
     @Activate
     protected void activate() {
         log.info("Starting IDCO");
-        appId = coreService.registerApplication("org.l2sm.app");
+        appId = coreService.registerApplication("org.l2sm.vnets.app");
 
         this.database = new IDCODatabase(log);
 

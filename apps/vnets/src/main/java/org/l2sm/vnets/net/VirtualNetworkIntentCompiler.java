@@ -48,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An intent compiler for {@link org.l2sm.net.VirtualLinkIntent}.
+ * An intent compiler for {@link org.l2sm.vnets.net.VirtualLinkIntent}.
  */
 @Component(immediate = true)
 public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetworkIntent> {
