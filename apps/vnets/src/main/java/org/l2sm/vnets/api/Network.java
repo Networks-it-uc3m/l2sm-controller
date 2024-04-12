@@ -14,6 +14,7 @@ public class Network {
     public String networkId;
     public List<ConnectPoint> networkEndpoints;
     public List<Long> tunnelIds;
+    
 
     public Network() {
 
