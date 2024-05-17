@@ -10,6 +10,18 @@ import org.onosproject.net.ConnectPoint;
 
 public class VLinkNetwork {
 
+    
+    // This class has 3 parameters:
+    //  - networkVlinkId:          It is the name of the Link (String)
+    //  - networkVlinkEndpoints:   They are the From and To Points (List<ConnectPoint>)
+    //  - tunnelIds:               Still trying to figure thisone out (List<Long>)
+    
+    // This class has the following commands:
+    //  - get
+    //  - clone
+    //  - to String
+    
+
 
     public String networkVlinkId;
     public List<ConnectPoint> networkVlinkEndpoints;
