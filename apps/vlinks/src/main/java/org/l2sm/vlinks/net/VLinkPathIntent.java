@@ -18,7 +18,7 @@ public class VLinkPathIntent extends Intent {
     // Protected so that the serializer is able to access them
     ConnectPoint one;
     ConnectPoint two;
-    Path path;
+    String[] path;
     long tunnelId;
     long vnisId;
 
@@ -46,7 +46,7 @@ public class VLinkPathIntent extends Intent {
 
         ConnectPoint one = null;
         ConnectPoint two = null;
-        Path path; //no creo que esto sea así revisar
+        String[] path; //no creo que esto sea así revisar
         long tunnelId;
         long vnisId = -1;
 
@@ -98,7 +98,7 @@ public class VLinkPathIntent extends Intent {
          * @param path Path
          * @return this builder
          */
-        public Builder path(Path path) {
+        public Builder path(String[] path) {
             this.path = path;
             return this;
         }
@@ -154,7 +154,7 @@ public class VLinkPathIntent extends Intent {
             Key key,
             ConnectPoint one,
             ConnectPoint two,
-            Path path,
+            String[] path,
             long tunnelId,
             long vnisId,
             int priority,
@@ -216,7 +216,7 @@ public class VLinkPathIntent extends Intent {
      *
      * @return path
      */
-    public Path path() {
+    public String[] path() {
         return path;
     }
 

@@ -17,9 +17,7 @@ import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.l2sm.vlinks.api.IDCOVLinkService;
 import org.l2sm.vlinks.api.IDCOVLinkServiceException;
 import org.l2sm.vlinks.api.VLinkNetwork;
-import org.l2sm.vlinks.net.VLinkIntent;
 import org.l2sm.vlinks.net.VLinkPathIntent;
-import org.l2sm.vlinks.net.VLinkNetworkIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
@@ -160,148 +158,25 @@ public class IDCOVLinkManager implements IDCOVLinkService {
         log.info("IDCO has stopped");
     }
 
-    public void createVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
-
+    public void createVLinkNetwork(String networkVlinkId, ConnectPoint networkVlinkFromEndpoint, ConnectPoint networkVlinkToEndpoint, String[] vLinkPath) throws IDCOVLinkServiceException {
+        
         genericEventHandler.submit(() -> {
             log.info("Creating network: " + networkVlinkId);
+            log.info("Adding new Path from " + networkVlinkFromEndpoint.toString() + " to " + networkVlinkToEndpoint.toString());
             database.lockVLinkNetwork(networkVlinkId);
-            /*
-             * if (database.networkExists(networkVlinkId)){
-             * database.unlockVLinkNetwork(networkVlinkId);
-             * throw new IDCOVLinkServiceException(
-             * "The network already exists");
-             * }
-             */
+
+
             log.info("Registering new network");
             database.registerVLinkNetwork(networkVlinkId);
-
-            database.unlockVLinkNetwork(networkVlinkId);
-            log.info("The network " + networkVlinkId + " was correctly created");
-        });
-    }
-
-    public void deleteVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Deleting network " + networkVlinkId);
-            database.lockVLinkNetwork(networkVlinkId);
-            Collection<Key> net_intent = database.getVLinkNetworkIntents(networkVlinkId);
-            /*
-             * if (net_intent == null) {
-             * database.unlockVLinkNetwork(networkVlinkId);
-             * throw new IDCOVLinkServiceException(
-             * "The network does not exist");
-             * }
-             */
-            log.info("Deleting intents for network " + networkVlinkId);
-            net_intent.forEach(intentKey -> {
-                Intent intent = intentService.getIntent(intentKey);
-                if (intent != null)
-                    intentService.withdraw(intent);
-            });
-
-            log.info("Deleting network "+ networkVlinkId + "from the database");
-            database.deleteVLinkNetwork(networkVlinkId);
-
-            log.info("The network with id \"" + networkVlinkId + "\" has been deleted");
-            database.unlockVLinkNetwork(networkVlinkId);
-        });
-
-    }
-
-    public void addVLinkPort(String networkVlinkId, ConnectPoint networkVlinkEndpoint) throws IDCOVLinkServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Adding port " + networkVlinkEndpoint.toString() + " to network " + networkVlinkId);
-            database.lockVLinkNetwork(networkVlinkId);
-            /*
-             * if (!database.networkExists(networkVlinkId)){
-             * database.unlockVLinkNetwork(networkVlinkId);
-             * throw new IDCOVLinkServiceException(
-             * "The network does not exist");
-             * }
-             */
-
-
-            Long tunnelId = tunnelIdProvider.getNewId();
-            
-            log.info("Adding port " + networkVlinkEndpoint + " to network " + networkVlinkId + " to the database");
-            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkEndpoint, tunnelId);
-            log.info("Port " + networkVlinkEndpoint + " in network " + networkVlinkId+ " added to the database");
-
-            // VLinkNetwork network = database.getVLinkNetwork(networkVlinkId); //network=createdNetwork
-            // int size = network.getVLinkNetworkEndpoints().size(); //size= al número de puertos añadidos
-
-            // ConnectPoint[] net_cps = new ConnectPoint[size]; //array of ConnectPoints the size of the network endPoints
-            
-            // network.getVLinkNetworkEndpoints().toArray(net_cps); // give an array of the endpoints
-            // long[] ids = Longs.toArray(network.getIds()); //gets the ids of the network of the endpoints
-
-            // Intent intent = null;
-            // Key intentKey = Key.of("idco-main-" + networkVlinkId, appId); //creates the intent in the specify network
-            // log.info("Creating main intent for network " + networkVlinkId);
-            // if (size == 1) {
-            //     log.info("Network has only one port, no intent is created");
-            //     database.unlockVLinkNetwork(networkVlinkId);
-            //     return;
-            // } else if (size == 2) {
-  
-            //     log.info("Creating virtual link intent between points " + net_cps[0] + " and " + net_cps[1]);
-            //     intent = VLinkIntent.builder()
-            //             .key(intentKey)
-            //             .appId(appId)
-            //             .one(net_cps[0])
-            //             .two(net_cps[1])
-            //             .priority(VIRTUAL_LINK_PRIORITY)
-            //             .tunnelID(ids[0])
-            //             .build();
-            // } else {
-            //     log.info("Creating virtual network intent");
-            //     intent = VLinkNetworkIntent.builder()
-            //             .key(intentKey)
-            //             .appId(appId)
-            //             .connectPoints(net_cps)
-            //             .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
-            //             .tunnelIDs(ids)
-            //             .build();
-
-            // }
-            // log.info("Submitting new main intent for network " + networkVlinkId);
-            // intentService.submit(intent);
-            // log.info("Adding main intent to database for the network " + networkVlinkId);
-            // database.addMainIntent(networkVlinkId, intentKey);
-            database.unlockVLinkNetwork(networkVlinkId);
-            log.info("Port " + networkVlinkEndpoint + " correctly added to "+ networkVlinkId);
-        });
-    }
-
-    public void createVLinkPath(String networkVlinkId, ConnectPoint networkVlinkFromEndpoint, ConnectPoint networkVlinkToEndpoint, Path vLinkPath) throws IDCOVLinkServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Adding new Path from " + networkVlinkFromEndpoint.toString() + " to " + networkVlinkToEndpoint.toString() + " to network " + networkVlinkId);
-            database.lockVLinkNetwork(networkVlinkId);
-            /*
-             * if (!database.networkExists(networkVlinkId)){
-             * database.unlockVLinkNetwork(networkVlinkId);
-             * throw new IDCOVLinkServiceException(
-             * "The network does not exist");
-             * }
-             */
-
-
-            Long tunnelId = tunnelIdProvider.getNewId(); //gives the
+            Long tunnelId = tunnelIdProvider.getNewId(); 
             
             log.info("Adding port " + networkVlinkFromEndpoint.toString() + " to network " + networkVlinkId + " to the database");
             database.addPortToVLinkNetwork(networkVlinkId, networkVlinkFromEndpoint, tunnelId);
-            // log.info("Adding port " + networkVlinkToEndpoint.toString() + " to network " + networkVlinkId + " to the database");
-            // tunnelId = tunnelIdProvider.getNewId();
-            // database.addPortToVLinkNetwork(networkVlinkId, networkVlinkToEndpoint, tunnelId);
-            // log.info("Ports added to the database");
+            log.info("Adding port " + networkVlinkToEndpoint.toString() + " to network " + networkVlinkId + " to the database");
+            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkToEndpoint, tunnelId);
+            log.info("Ports added to the database");
 
             VLinkNetwork network = database.getVLinkNetwork(networkVlinkId);
-            //int size = network.getVLinkNetworkEndpoints().size(); //size= al número de puertos añadidos
-
-            //network.getVLinkNetworkEndpoints().toArray(net_cps);
-            //ConnectPoint[] net_cps = new ConnectPoint[size];
-
-            //How to get the tunnelIds of the vLinkPath
             long[] ids = Longs.toArray(network.getIds());
 
             Intent intent = null;
@@ -323,9 +198,32 @@ public class IDCOVLinkManager implements IDCOVLinkService {
             log.info("Adding main intent to database for the network " + networkVlinkId);
             database.addMainIntent(networkVlinkId, intentKey);
             database.unlockVLinkNetwork(networkVlinkId);
-            log.info("Port " + networkVlinkFromEndpoint + " and " + networkVlinkToEndpoint + " correctly added to "+ networkVlinkId);
+            log.info("The network " + networkVlinkId + " from " + networkVlinkFromEndpoint + " to " + networkVlinkToEndpoint + " was correctly created");
         });
     }
+
+    public void deleteVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
+        genericEventHandler.submit(() -> {
+            log.info("Deleting network " + networkVlinkId);
+            database.lockVLinkNetwork(networkVlinkId);
+            Collection<Key> net_intent = database.getVLinkNetworkIntents(networkVlinkId);
+
+            log.info("Deleting intents for network " + networkVlinkId);
+            net_intent.forEach(intentKey -> {
+                Intent intent = intentService.getIntent(intentKey);
+                if (intent != null)
+                    intentService.withdraw(intent);
+            });
+
+            log.info("Deleting network "+ networkVlinkId + "from the database");
+            database.deleteVLinkNetwork(networkVlinkId);
+
+            log.info("The network with id \"" + networkVlinkId + "\" has been deleted");
+            database.unlockVLinkNetwork(networkVlinkId);
+        });
+
+    }
+
 
     public VLinkNetwork getVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
 

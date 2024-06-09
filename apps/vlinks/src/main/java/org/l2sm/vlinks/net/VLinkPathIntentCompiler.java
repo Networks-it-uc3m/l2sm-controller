@@ -25,11 +25,22 @@ import org.onosproject.net.intent.IntentException;
 import org.onosproject.net.intent.IntentExtensionService;
 import org.onosproject.net.intent.TwoWayP2PIntent;
 import org.onosproject.net.topology.PathService;
+import org.onosproject.net.link.LinkService;
+import org.onosproject.net.DefaultPath;
+import org.onosproject.net.Path;
+import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.Link;
+import org.onosproject.net.DefaultLink;
+import org.onosproject.net.ElementId;
+import org.onlab.graph.ScalarWeight;
+import org.onosproject.net.provider.ProviderId;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,8 +50,10 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 public class VLinkPathIntentCompiler implements IntentCompiler<VLinkPathIntent> {
 
 
+        private final Logger log = LoggerFactory.getLogger(getClass());
+        
         @Reference(cardinality = ReferenceCardinality.MANDATORY)
-        protected PathService pathService;
+        protected LinkService linkService;
 
         @Reference(cardinality = ReferenceCardinality.MANDATORY)
         protected IntentExtensionService intentExtensionService;
@@ -64,33 +77,39 @@ public class VLinkPathIntentCompiler implements IntentCompiler<VLinkPathIntent> 
                 List<DeviceId> toInstallDevices = new ArrayList<>();
                 List<NetworkResource> resources = new ArrayList<>();
 
-                // The case where both connect points are in the same NED
-                // Could be done with a pointtopointintent
+
                 if (intent.one().deviceId().equals(intent.two().deviceId())) {
                         return List.of(TwoWayP2PIntent.builder().appId(intent.appId()).one(intent.one())
                                         .two(intent.two()).priority(intent.priority()).build());
                 }
 
-                //Set<Path> paths = pathService.getPaths(intent.one().deviceId(), intent.two().deviceId());
-                //Path path = paths.iterator().hasNext() ? paths.iterator().next() : null;
-                Path path = intent.path();
-                if (path == null) {
-                        throw new IntentException("El path es null");
-                } 
+                String[] path = intent.path();
 
-                List<Link> path_links = path.links();
+
+                Iterable<Link> links = linkService.getActiveLinks();
+
+
+                List<Link> path_links = new ArrayList<>();
+
+
+                for (int i = 0; i < (path.length - 1); i++) {
+
+                        for (Link link : links){
+                                if (link.dst().elementId().toString().equals(path[i+1]) && link.src().elementId().toString().equals(path[i])){
+
+                                        path_links.add(link);
+
+                                }
+                        }
+                
+                }
+
 
                 resources.add(path_links.get(0));
+
                 long tunnelId = intent.tunnelId();
-                // The intermediate nodes path
+
                 for (int i = 1; i < path_links.size(); i++) {
-                        // log.info("Link: " + i);
-                        // log.info("Source Device: " + path_links.get(i).src().deviceId() + "/" + path_links.get(i).src().port());
-                        // log.info("Destination Device: " + path_links.get(i).dst().deviceId() + "/" + path_links.get(i).dst().port());
-                        // log.info("____________________________________");
-                        // log.info("Adding info to switch: " + path_links.get(i).src().deviceId());
-                        // log.info("Port Entrance: " + path_links.get(i - 1).dst().port());
-                        // log.info("Port Exit: " + path_links.get(i).src().port());
 
                         resources.add(path_links.get(i));
                         ConnectPoint port_1 = path_links.get(i - 1).dst();
@@ -103,8 +122,8 @@ public class VLinkPathIntentCompiler implements IntentCompiler<VLinkPathIntent> 
 
                 }
 
-                ConnectPoint one_tun_port = path.links().get(0).src();
-                ConnectPoint two_tun_port = path.links().get(path.links().size() - 1).dst();
+                ConnectPoint one_tun_port = path_links.get(0).src();
+                ConnectPoint two_tun_port = path_links.get(path_links.size() - 1).dst();
 
                 // Objectives for port 1 (two objectives)
                 toInstallObjectives.addAll(createEdgeFwdObjectives(intent.one(), one_tun_port, intent, tunnelId));
