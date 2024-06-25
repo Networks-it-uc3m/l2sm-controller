@@ -20,7 +20,6 @@ public class VLinkPathIntent extends Intent {
     ConnectPoint two;
     String[] path;
     long tunnelId;
-    long vnisId;
 
     /**
      * Returns a new virtual link builder.
@@ -48,7 +47,6 @@ public class VLinkPathIntent extends Intent {
         ConnectPoint two = null;
         String[] path; //no creo que esto sea así revisar
         long tunnelId;
-        long vnisId = -1;
 
         private Builder() {
             // Hide constructor
@@ -116,16 +114,6 @@ public class VLinkPathIntent extends Intent {
             return this;
         }
 
-                /**
-         * Sets the  vnis Id of the Path
-         *
-         * @param vnisId Path id
-         * @return this builder
-         */
-        public Builder vnisId(long vnisId) {
-            this.vnisId = vnisId;
-            return this;
-        }
 
         /**
          * Builds a virtual link intent from the accumulated parameters.
@@ -140,7 +128,6 @@ public class VLinkPathIntent extends Intent {
                     two,
                     path,
                     tunnelId,
-                    vnisId,
                     priority,
                     resourceGroup);
         }
@@ -156,7 +143,6 @@ public class VLinkPathIntent extends Intent {
             ConnectPoint two,
             String[] path,
             long tunnelId,
-            long vnisId,
             int priority,
             ResourceGroup resourceGroup) {
         super(appId,
@@ -168,7 +154,6 @@ public class VLinkPathIntent extends Intent {
         this.one = one;
         this.two = two;
         this.path = path;
-        this.vnisId = vnisId;
         this.tunnelId = tunnelId;
     }
 
@@ -180,7 +165,6 @@ public class VLinkPathIntent extends Intent {
         this.two = null;
         this.path = null;
         this.tunnelId = -1;
-        this.vnisId = -1;
     }
 
     /**
@@ -221,15 +205,6 @@ public class VLinkPathIntent extends Intent {
     }
 
 
-    /**
-     * Return the id the virtual link
-     *
-     * @return vnisId
-     */
-    public long vnisId() {
-        return vnisId;
-    }
-
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(getClass())
@@ -242,7 +217,6 @@ public class VLinkPathIntent extends Intent {
                 .add("two", two())
                 .add("path", path())
                 .add("tunnelID", tunnelId())
-                .add("vnisId", vnisId())
                 .add("resourceGroup", resourceGroup())
                 .toString();
     }

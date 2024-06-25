@@ -46,7 +46,7 @@ public class L2SMVLinkCreateNetwork extends AbstractShellCommand {
             print("Success! Network:" + networkVlinkId + " has been created");
             print(networkVlinkId + " From EndPoint: " + networkVlinkFromEndpoint);
             print(networkVlinkId + " To EndPoint: " + networkVlinkToEndpoint);
-            print(networkVlinkId + " Path: " + networkVlinkFromEndpoint);
+            print(networkVlinkId + " Path: ");
             for (int i= 0; i < vLinkPath.length; i++){
                 print("Node " + i + " : " + vLinkPath[i]);
             }

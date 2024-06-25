@@ -188,7 +188,6 @@ public class IDCOVLinkManager implements IDCOVLinkService {
                     .one(networkVlinkFromEndpoint)
                     .two(networkVlinkToEndpoint)
                     .path(vLinkPath)
-                    .vnisId(1)
                     .priority(VIRTUAL_LINK_PRIORITY)
                     .tunnelID(tunnelId)
                     .build();
