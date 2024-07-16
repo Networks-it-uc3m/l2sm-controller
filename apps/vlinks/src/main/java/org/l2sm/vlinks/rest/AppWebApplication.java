@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package org.l2sm.vlinks;
+package org.l2sm.vlinks.rest;
 
 import org.onlab.rest.AbstractWebApplication;
-
 import java.util.Set;
 
 /**
@@ -26,6 +25,6 @@ import java.util.Set;
 public class AppWebApplication extends AbstractWebApplication {
     @Override
     public Set<Class<?>> getClasses() {
-        return getClasses(AppWebResource.class);
+        return getClasses(AppWebResource.class, RESTExceptionMapper.class, ObjectProvider.class);
     }
 }
