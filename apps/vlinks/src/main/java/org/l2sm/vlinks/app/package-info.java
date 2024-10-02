@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-present Open Networking Foundation
+ * Copyright 2022-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.l2sm.vlinks.cli;
-
-import org.apache.karaf.shell.api.action.Command;
-import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.onosproject.cli.AbstractShellCommand;
 
 /**
- * Sample Apache Karaf CLI command.
+ * ONOS application archetype.
  */
-@Service
-@Command(scope = "onos", name = "sample",
-         description = "Sample Apache Karaf CLI command")
-public class AppCommand extends AbstractShellCommand {
-
-    @Override
-    protected void doExecute() {
-        print("Hello %s", "World");
-    }
-
-}
+package org.l2sm.vlinks.app;

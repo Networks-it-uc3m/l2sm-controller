@@ -1,4 +1,4 @@
-package org.l2sm.vnets.app;
+package org.l2sm.vlinks.app;
 
 import static org.onlab.util.Tools.groupedThreads;
 
@@ -14,16 +14,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.l2sm.vnets.api.IDCOService;
-import org.l2sm.vnets.api.IDCOServiceException;
-import org.l2sm.vnets.api.Network;
-import org.l2sm.vnets.net.VirtualLinkIntent;
-import org.l2sm.vnets.net.VirtualNetworkIntent;
+import org.l2sm.vlinks.api.IDCOVLinkService;
+import org.l2sm.vlinks.api.IDCOVLinkServiceException;
+import org.l2sm.vlinks.api.VLinkNetwork;
+import org.l2sm.vlinks.net.VLinkPathIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.Path;
+import org.onosproject.net.DefaultPath;
 import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.DefaultFlowRule;
@@ -59,7 +60,7 @@ import com.google.common.primitives.Longs;
 
 @Component(immediate = true)
 @Service
-public class IDCOManager implements IDCOService {
+public class IDCOVLinkManager implements IDCOVLinkService {
 
     private static final int VIRTUAL_LINK_PRIORITY = PacketPriority.HIGH3.priorityValue();
     private static final PacketPriority ARP_TO_CONTROLLER_PRIORITY = PacketPriority.HIGH2;
@@ -89,7 +90,7 @@ public class IDCOManager implements IDCOService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected ObjectiveTrackerService objectiveTrackerService;
 
-    private IDCODatabase database;
+    private IDCOVLinkDatabase database;
     private TunnelIdProvider tunnelIdProvider;
 
     private ArpProxyPacketProcessor packetProcessor;
@@ -103,9 +104,9 @@ public class IDCOManager implements IDCOService {
     @Activate
     protected void activate() {
         log.info("Starting IDCO");
-        appId = coreService.registerApplication("org.l2sm.vnets.app");
+        appId = coreService.registerApplication("org.l2sm.app");
 
-        this.database = new IDCODatabase(log);
+        this.database = new IDCOVLinkDatabase(log);
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -151,133 +152,86 @@ public class IDCOManager implements IDCOService {
         });
 
         log.info("Clearing database");
-        database.cleanDatabases();
+        database.cleanVLinkDatabases();
         intentService.removeListener(intentListener);
 
         log.info("IDCO has stopped");
     }
 
-    public void createVirtualNetwork(String networkId) throws IDCOServiceException {
-
+    public void createVLinkNetwork(String networkVlinkId, ConnectPoint networkVlinkFromEndpoint, ConnectPoint networkVlinkToEndpoint, String[] vLinkPath) throws IDCOVLinkServiceException {
+        
         genericEventHandler.submit(() -> {
-            log.info("Creating network: " + networkId);
-            database.lockNetwork(networkId);
-            /*
-             * if (database.networkExists(networkId)){
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network already exists");
-             * }
-             */
-            log.info("Registering new network");
-            database.registerNetwork(networkId);
+            log.info("Creating network: " + networkVlinkId);
+            log.info("Adding new Path from " + networkVlinkFromEndpoint.toString() + " to " + networkVlinkToEndpoint.toString());
+            database.lockVLinkNetwork(networkVlinkId);
 
-            database.unlockNetwork(networkId);
-            log.info("The network " + networkId + " was correctly created");
+
+            log.info("Registering new network");
+            database.registerVLinkNetwork(networkVlinkId);
+            Long tunnelId = tunnelIdProvider.getNewId(); 
+            
+            log.info("Adding port " + networkVlinkFromEndpoint.toString() + " to network " + networkVlinkId + " to the database");
+            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkFromEndpoint, tunnelId);
+            log.info("Adding port " + networkVlinkToEndpoint.toString() + " to network " + networkVlinkId + " to the database");
+            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkToEndpoint, tunnelId);
+            log.info("Ports added to the database");
+
+            VLinkNetwork network = database.getVLinkNetwork(networkVlinkId);
+            long[] ids = Longs.toArray(network.getIds());
+
+            Intent intent = null;
+            Key intentKey = Key.of("idco-main-" + networkVlinkId, appId);
+            log.info("Creating main intent for network " + networkVlinkId);
+            intent = VLinkPathIntent.builder()
+                    .key(intentKey)  
+                    .appId(appId)
+                    .one(networkVlinkFromEndpoint)
+                    .two(networkVlinkToEndpoint)
+                    .path(vLinkPath)
+                    .priority(VIRTUAL_LINK_PRIORITY)
+                    .tunnelID(tunnelId)
+                    .build();
+
+            log.info("Submitting new main intent for network " + networkVlinkId);
+            intentService.submit(intent);
+            log.info("Adding main intent to database for the network " + networkVlinkId);
+            database.addMainIntent(networkVlinkId, intentKey);
+            database.unlockVLinkNetwork(networkVlinkId);
+            log.info("The network " + networkVlinkId + " from " + networkVlinkFromEndpoint + " to " + networkVlinkToEndpoint + " was correctly created");
         });
     }
 
-    public void deleteVirtualNetwork(String networkId) throws IDCOServiceException {
+    public void deleteVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
         genericEventHandler.submit(() -> {
-            log.info("Deleting network " + networkId);
-            database.lockNetwork(networkId);
-            Collection<Key> net_intent = database.getNetworkIntents(networkId);
-            /*
-             * if (net_intent == null) {
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network does not exist");
-             * }
-             */
-            log.info("Deleting intents for network " + networkId);
+            log.info("Deleting network " + networkVlinkId);
+            database.lockVLinkNetwork(networkVlinkId);
+            Collection<Key> net_intent = database.getVLinkNetworkIntents(networkVlinkId);
+
+            log.info("Deleting intents for network " + networkVlinkId);
             net_intent.forEach(intentKey -> {
                 Intent intent = intentService.getIntent(intentKey);
                 if (intent != null)
                     intentService.withdraw(intent);
             });
 
-            log.info("Deleting network "+ networkId + "from the database");
-            database.deleteNetwork(networkId);
+            log.info("Deleting network "+ networkVlinkId + "from the database");
+            database.deleteVLinkNetwork(networkVlinkId);
 
-            log.info("The network with id \"" + networkId + "\" has been deleted");
-            database.unlockNetwork(networkId);
+            log.info("The network with id \"" + networkVlinkId + "\" has been deleted");
+            database.unlockVLinkNetwork(networkVlinkId);
         });
 
     }
 
-    public void addPort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Adding port " + networkEndpoint.toString() + " to network " + networkId);
-            database.lockNetwork(networkId);
-            /*
-             * if (!database.networkExists(networkId)){
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network does not exist");
-             * }
-             */
 
+    public VLinkNetwork getVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
 
-            Long tunnelId = tunnelIdProvider.getNewId();
-            
-            log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
-            database.addPortToNetwork(networkId, networkEndpoint, tunnelId);
-            log.info("Port " + networkEndpoint + " in network " + networkId+ " added to the database");
+        Future<VLinkNetwork> future = genericEventHandler.submit(() -> {
+            log.info("Retrieving network " + networkVlinkId);
+            database.lockVLinkNetwork(networkVlinkId);
 
-            Network network = database.getNetwork(networkId);
-            int size = network.getNetworkEndpoints().size();
-
-            ConnectPoint[] net_cps = new ConnectPoint[size];
-            
-            network.getNetworkEndpoints().toArray(net_cps);
-            long[] ids = Longs.toArray(network.getIds());
-
-            Intent intent = null;
-            Key intentKey = Key.of("idco-main-" + networkId, appId);
-            log.info("Creating main intent for network " + networkId);
-            if (size == 1) {
-                log.info("Network has only one port, no intent is created");
-                database.unlockNetwork(networkId);
-                return;
-            } else if (size == 2) {
-  
-                log.info("Creating virtual link intent between points " + net_cps[0] + " and " + net_cps[1]);
-                intent = VirtualLinkIntent.builder()
-                        .key(intentKey)
-                        .appId(appId)
-                        .one(net_cps[0])
-                        .two(net_cps[1])
-                        .priority(VIRTUAL_LINK_PRIORITY)
-                        .tunnelID(ids[0])
-                        .build();
-            } else {
-                log.info("Creating virtual network intent");
-                intent = VirtualNetworkIntent.builder()
-                        .key(intentKey)
-                        .appId(appId)
-                        .connectPoints(net_cps)
-                        .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
-                        .tunnelIDs(ids)
-                        .build();
-
-            }
-            log.info("Submitting new main intent for network " + networkId);
-            intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkId);
-            database.addMainIntent(networkId, intentKey);
-            database.unlockNetwork(networkId);
-            log.info("Port " + networkEndpoint + " correctly added to "+ networkId);
-        });
-    }
-
-    public Network getVirtualNetwork(String networkId) throws IDCOServiceException {
-
-        Future<Network> future = genericEventHandler.submit(() -> {
-            log.info("Retrieving network " + networkId);
-            database.lockNetwork(networkId);
-
-            Network network = database.getNetwork(networkId);
-            database.unlockNetwork(networkId);
+            VLinkNetwork network = database.getVLinkNetwork(networkVlinkId);
+            database.unlockVLinkNetwork(networkVlinkId);
             return network;
         });
 
@@ -318,12 +272,12 @@ public class IDCOManager implements IDCOService {
             MacAddress dstMac = eth.getDestinationMAC();
             ConnectPoint heardPort = context.inPacket().receivedFrom();
 
-            String mscsId = database.getNetworkIdForPort(heardPort);
+            String mscsId = database.getVLinkNetworkIdForPort(heardPort);
             if (mscsId == null) {
                 return;
             }
 
-            database.lockNetwork(mscsId);
+            database.lockVLinkNetwork(mscsId);
 
             if (!(dstMac.isBroadcast() || dstMac.isMulticast())) {
                 ConnectPoint hostLocation = database.getHostLocation(mscsId, dstMac);
@@ -334,13 +288,13 @@ public class IDCOManager implements IDCOService {
                             context.inPacket().unparsed());
                     packetService.emit(outboundPacket);
                     context.block();
-                    database.unlockNetwork(mscsId);
+                    database.unlockVLinkNetwork(mscsId);
                     return;
                 }
 
             }
 
-            Collection<ConnectPoint> connectPoints = database.getPortsOfNetworkGivenPort(heardPort);
+            Collection<ConnectPoint> connectPoints = database.getPortsOfVLinkNetworkGivenPort(heardPort);
 
             connectPoints.forEach(point -> {
                 TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
@@ -351,7 +305,7 @@ public class IDCOManager implements IDCOService {
 
             context.block();
             log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId.toString());
-            database.unlockNetwork(mscsId);
+            database.unlockVLinkNetwork(mscsId);
         }
 
     }
@@ -416,11 +370,11 @@ public class IDCOManager implements IDCOService {
 
         public void detectedHost(MacAddress macAddress, ConnectPoint hostLocation, PacketContext context) {
 
-            String mscsId = database.getNetworkIdForPort(hostLocation);
+            String mscsId = database.getVLinkNetworkIdForPort(hostLocation);
             if (mscsId == null) {
                 return;
             }
-            database.lockNetwork(mscsId);
+            database.lockVLinkNetwork(mscsId);
             log.info("New packet received: " + macAddress.toString() + " for network " + mscsId.toString());
 
             ConnectPoint lastLocation = database.getHostLocation(mscsId, macAddress);
@@ -430,18 +384,18 @@ public class IDCOManager implements IDCOService {
                     log.warn("The host " + macAddress.toString() + " in network " + mscsId
                             + " has changed its location. The system does not supporthost mobility");
                 }
-                database.unlockNetwork(mscsId);
+                database.unlockVLinkNetwork(mscsId);
                 return;
             }
 
             Long tunnelId = database.getTunnelIdOfPort(hostLocation);
             if (tunnelId == null) {
                 context.block();
-                database.unlockNetwork(mscsId);
+                database.unlockVLinkNetwork(mscsId);
                 return;
             }
 
-            Collection<ConnectPoint> connectPoint = database.getPortsOfNetworkGivenPort(hostLocation);
+            Collection<ConnectPoint> connectPoint = database.getPortsOfVLinkNetworkGivenPort(hostLocation);
 
             List<FlowRule> rules = connectPoint.stream()
                     .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
@@ -453,9 +407,9 @@ public class IDCOManager implements IDCOService {
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
 
             intentService.submit(ruleIntent);
-            database.addIntentToNetwork(mscsId, key);
+            database.addIntentToVLinkNetwork(mscsId, key);
             database.setHostLocation(mscsId, macAddress, hostLocation);
-            database.unlockNetwork(mscsId);
+            database.unlockVLinkNetwork(mscsId);
         }
 
         private FlowRule createRule(MacAddress address, ConnectPoint cp, ConnectPoint otherCp, long tunnelId) {

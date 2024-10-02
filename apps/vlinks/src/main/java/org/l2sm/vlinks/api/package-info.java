@@ -1,5 +1,5 @@
 /*
- * Copyright 2024-present Open Networking Foundation
+ * Copyright 2022-present Open Networking Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,7 @@
  * limitations under the License.
  */
 
-package org.l2sm.vlinks;
-
-import org.onlab.rest.AbstractWebApplication;
-
-import java.util.Set;
-
 /**
- * Sample REST API web application.
+ * ONOS application archetype.
  */
-public class AppWebApplication extends AbstractWebApplication {
-    @Override
-    public Set<Class<?>> getClasses() {
-        return getClasses(AppWebResource.class);
-    }
-}
+package org.l2sm.vlinks.api;

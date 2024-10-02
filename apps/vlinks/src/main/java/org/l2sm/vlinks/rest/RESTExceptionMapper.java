@@ -1,11 +1,11 @@
-package org.l2sm.vnets.rest;
+package org.l2sm.vlinks.rest;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 
-import org.l2sm.vnets.api.IDCOServiceException;
+import org.l2sm.vlinks.api.IDCOVLinkServiceException;
 
 import com.fasterxml.jackson.core.JsonParseException;
 
@@ -23,12 +23,12 @@ public class RESTExceptionMapper implements ExceptionMapper<Exception> {
             return Response.status(Status.BAD_REQUEST).entity(errorResponse).build();
         }
 
-        if (!(generalException instanceof IDCOServiceException)) {
+        if (!(generalException instanceof IDCOVLinkServiceException)) {
             ErrorResponse errorResponse = new ErrorResponse("INTERNAL_ERROR", INTERNAL_ERROR_MESSAGE);
             return Response.status(Status.INTERNAL_SERVER_ERROR).entity(errorResponse).build();
         }
 
-        IDCOServiceException exception = (IDCOServiceException) generalException;
+        IDCOVLinkServiceException exception = (IDCOVLinkServiceException) generalException;
 
         Status status = null;
 

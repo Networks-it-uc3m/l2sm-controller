@@ -13,23 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.l2sm.vlinks.cli;
 
-import org.apache.karaf.shell.api.action.Command;
-import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.onosproject.cli.AbstractShellCommand;
+package org.l2sm.vlinks.rest;
+
+import org.onlab.rest.AbstractWebApplication;
+import java.util.Set;
 
 /**
- * Sample Apache Karaf CLI command.
+ * Sample REST API web application.
  */
-@Service
-@Command(scope = "onos", name = "sample",
-         description = "Sample Apache Karaf CLI command")
-public class AppCommand extends AbstractShellCommand {
-
+public class AppWebApplication extends AbstractWebApplication {
     @Override
-    protected void doExecute() {
-        print("Hello %s", "World");
+    public Set<Class<?>> getClasses() {
+        return getClasses(AppWebResource.class, RESTExceptionMapper.class, ObjectProvider.class);
     }
-
 }

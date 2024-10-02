@@ -28,10 +28,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.l2sm.api.IDCOService;
-import org.l2sm.api.IDCOServiceException;
-import org.l2sm.api.Network;
-import org.l2sm.dto.NetworkDTO;
+import org.l2sm.vnets.api.IDCOService;
+import org.l2sm.vnets.api.IDCOServiceException;
+import org.l2sm.vnets.api.Network;
+import org.l2sm.vnets.dto.NetworkDTO;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.rest.AbstractWebResource;
 

@@ -3,7 +3,7 @@ package org.l2sm.vnets.cli;
 import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
-import org.l2sm.api.IDCOService;
+import org.l2sm.vnets.api.IDCOService;
 import org.onosproject.cli.AbstractShellCommand;
 
 @Service
