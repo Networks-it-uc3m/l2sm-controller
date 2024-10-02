@@ -14,25 +14,21 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0"   
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"   
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0   
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">   
+    <modelVersion>4.0.0</modelVersion>   
 
-    <parent>
-        <groupId>org.l2sm</groupId>
-        <artifactId>controller</artifactId>
-        <version>1</version>
-    </parent>
+    <groupId>org.l2sm</groupId>   
+    <artifactId>controller</artifactId>   
+    <version>1.0-SNAPSHOT</version>   
+    <packaging>pom</packaging>   
 
-    <groupId>org.l2sm</groupId>
-    <artifactId>controller</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
+    <description>L2S-M Controller ONOS applications</description>   
 
-    <description>L2S-M Controller ONOS applications</description>
-
-    <modules>
-        <module>vnets</module>
-        <module>vlinks</module>
-    </modules>
-
+    <modules>   
+        <module>apps/vnets</module>   
+        <module>apps/vlinks</module>   
+    </modules>   
 </project>
