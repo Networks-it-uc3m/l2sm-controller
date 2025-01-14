@@ -266,9 +266,13 @@ def configure_switch(switch, controller_ip, controller_port, neighbors, switch_i
 
 
     # Set the controller
-   
+    print(switch.name,neighbors)
 
     for neighbor in neighbors:
+        print("Creating vxlan: ",switch.name,neighbor)
+        print("ovs-vsctl add-port brtun-" + switch.name + " vxlan{}-{} -- set interface vxlan{}-{} type=vxlan "
+                        "options:local_ip={} options:remote_ip={} options:key=flow".format(
+                        switch.name, neighbor, switch.name, neighbor, switch_ips[switch.name], switch_ips[neighbor]))
         switch.cmdPrint("ovs-vsctl add-port brtun-" + switch.name + " vxlan{}-{} -- set interface vxlan{}-{} type=vxlan "
                         "options:local_ip={} options:remote_ip={} options:key=flow".format(
                         switch.name, neighbor, switch.name, neighbor, switch_ips[switch.name], switch_ips[neighbor]))
@@ -299,7 +303,7 @@ def demo2():
     net.stop()
 
 def demo():
-    CONTROLLER_IP = "localhost"
+    CONTROLLER_IP = "10.0.2.4"
     CONTROLLER_PORT = 6633
 
     net = Mininet(controller=RemoteController)
@@ -320,11 +324,11 @@ def demo():
     net.addLink(s5, h2)
 
     switch_ips = {
-        "s1": "192.168.0.2",
-        "s2": "192.168.0.3",
-        "s3": "192.168.0.4",
-        "s4": "192.168.0.5",
-        "s5": "192.168.0.6"
+        "s1": "192.168.0.7",
+        "s2": "192.168.0.8",
+        "s3": "192.168.0.9",
+        "s4": "192.168.0.10",
+        "s5": "192.168.0.11"
     }
     vxlan_config = {
         "s1": ["s2", "s3"],

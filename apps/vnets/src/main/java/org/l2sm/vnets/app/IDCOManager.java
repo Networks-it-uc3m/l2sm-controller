@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -136,18 +137,25 @@ public class IDCOManager implements IDCOService {
         packetService.removeProcessor(vnfLocationProvider);
 
         log.info("Shutting down the event handler");
-        genericEventHandler.shutdown();
         try {
-            genericEventHandler.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            log.error("Could not shutdown thread executors correctly");
+            genericEventHandler.shutdown();
+            if (!genericEventHandler.awaitTermination(60, TimeUnit.SECONDS)) {
+                genericEventHandler.shutdownNow();
+                if (!genericEventHandler.awaitTermination(60, TimeUnit.SECONDS)) {
+                    log.error("Executor did not terminate");
+                }
+            }
+        } catch (InterruptedException ie) {
+            genericEventHandler.shutdownNow();
+            Thread.currentThread().interrupt(); // Preserve interrupt status
         }
 
         log.info("Withdrawing all the intents");
         database.getAllIntents().forEach(intentKey -> {
             Intent intent = intentService.getIntent(intentKey);
-            if (intentKey != null)
+            if (intent != null) {
                 intentService.withdraw(intent);
+            }
         });
 
         log.info("Clearing database");
@@ -158,146 +166,130 @@ public class IDCOManager implements IDCOService {
     }
 
     public void createVirtualNetwork(String networkId) throws IDCOServiceException {
-
         genericEventHandler.submit(() -> {
             log.info("Creating network: " + networkId);
-            database.lockNetwork(networkId);
-            /*
-             * if (database.networkExists(networkId)){
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network already exists");
-             * }
-             */
-            log.info("Registering new network");
-            database.registerNetwork(networkId);
-
-            database.unlockNetwork(networkId);
-            log.info("The network " + networkId + " was correctly created");
+            try {
+                if (database.networkExists(networkId)) {
+                    throw new IDCOServiceException("The network already exists");
+                }
+                log.info("Registering new network");
+                database.registerNetwork(networkId);
+                log.info("The network " + networkId + " was correctly created");
+            } catch (IDCOServiceException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } 
         });
     }
 
     public void deleteVirtualNetwork(String networkId) throws IDCOServiceException {
         genericEventHandler.submit(() -> {
             log.info("Deleting network " + networkId);
-            database.lockNetwork(networkId);
-            Collection<Key> net_intent = database.getNetworkIntents(networkId);
-            /*
-             * if (net_intent == null) {
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network does not exist");
-             * }
-             */
-            log.info("Deleting intents for network " + networkId);
-            net_intent.forEach(intentKey -> {
-                Intent intent = intentService.getIntent(intentKey);
-                if (intent != null)
-                    intentService.withdraw(intent);
-            });
-
-            log.info("Deleting network "+ networkId + "from the database");
-            database.deleteNetwork(networkId);
-
-            log.info("The network with id \"" + networkId + "\" has been deleted");
-            database.unlockNetwork(networkId);
+            try {
+                Collection<Key> netIntent = database.getNetworkIntents(networkId);
+                if (netIntent == null) {
+                    throw new IDCOServiceException("The network does not exist");
+                }
+                log.info("Deleting intents for network " + networkId);
+                netIntent.forEach(intentKey -> {
+                    Intent intent = intentService.getIntent(intentKey);
+                    if (intent != null) {
+                        intentService.withdraw(intent);
+                    }
+                });
+                log.info("Deleting network " + networkId + " from the database");
+                database.deleteNetwork(networkId);
+                log.info("The network with id \"" + networkId + "\" has been deleted");
+            } catch (IDCOServiceException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } 
         });
-
     }
 
     public void addPort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
         genericEventHandler.submit(() -> {
             log.info("Adding port " + networkEndpoint.toString() + " to network " + networkId);
-            database.lockNetwork(networkId);
-            /*
-             * if (!database.networkExists(networkId)){
-             * database.unlockNetwork(networkId);
-             * throw new IDCOServiceException(
-             * "The network does not exist");
-             * }
-             */
+            try {
+                if (!database.networkExists(networkId)) {
+                    throw new IDCOServiceException("The network does not exist");
+                }
 
+                Long tunnelId = tunnelIdProvider.getNewId();
+                log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
+                database.addPortToNetwork(networkId, networkEndpoint, tunnelId);
+                log.info("Port " + networkEndpoint + " in network " + networkId + " added to the database");
 
-            Long tunnelId = tunnelIdProvider.getNewId();
-            
-            log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
-            database.addPortToNetwork(networkId, networkEndpoint, tunnelId);
-            log.info("Port " + networkEndpoint + " in network " + networkId+ " added to the database");
+                Network network = database.getNetwork(networkId);
+                int size = network.getNetworkEndpoints().size();
 
-            Network network = database.getNetwork(networkId);
-            int size = network.getNetworkEndpoints().size();
+                ConnectPoint[] netCps = new ConnectPoint[size];
+                network.getNetworkEndpoints().toArray(netCps);
+                long[] ids = Longs.toArray(network.getIds());
 
-            ConnectPoint[] net_cps = new ConnectPoint[size];
-            
-            network.getNetworkEndpoints().toArray(net_cps);
-            long[] ids = Longs.toArray(network.getIds());
-
-            Intent intent = null;
-            Key intentKey = Key.of("idco-main-" + networkId, appId);
-            log.info("Creating main intent for network " + networkId);
-            if (size == 1) {
-                log.info("Network has only one port, no intent is created");
-                database.unlockNetwork(networkId);
-                return;
-            } else if (size == 2) {
-  
-                log.info("Creating virtual link intent between points " + net_cps[0] + " and " + net_cps[1]);
-                intent = VirtualLinkIntent.builder()
-                        .key(intentKey)
-                        .appId(appId)
-                        .one(net_cps[0])
-                        .two(net_cps[1])
-                        .priority(VIRTUAL_LINK_PRIORITY)
-                        .tunnelID(ids[0])
-                        .build();
-            } else {
-                log.info("Creating virtual network intent");
-                intent = VirtualNetworkIntent.builder()
-                        .key(intentKey)
-                        .appId(appId)
-                        .connectPoints(net_cps)
-                        .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
-                        .tunnelIDs(ids)
-                        .build();
-
+                Intent intent = null;
+                Key intentKey = Key.of("idco-main-" + networkId, appId);
+                log.info("Creating main intent for network " + networkId);
+                if (size == 1) {
+                    log.info("Network has only one port, no intent is created");
+                } else if (size == 2) {
+                    log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
+                    intent = VirtualLinkIntent.builder()
+                            .key(intentKey)
+                            .appId(appId)
+                            .one(netCps[0])
+                            .two(netCps[1])
+                            .priority(VIRTUAL_LINK_PRIORITY)
+                            .tunnelID(ids[0])
+                            .build();
+                } else {
+                    log.info("Creating virtual network intent");
+                    intent = VirtualNetworkIntent.builder()
+                            .key(intentKey)
+                            .appId(appId)
+                            .connectPoints(netCps)
+                            .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
+                            .tunnelIDs(ids)
+                            .build();
+                }
+                if (intent != null) {
+                    log.info("Submitting new main intent for network " + networkId);
+                    intentService.submit(intent);
+                    log.info("Adding main intent to database for the network " + networkId);
+                    database.addMainIntent(networkId, intentKey);
+                }
+                log.info("Port " + networkEndpoint + " correctly added to " + networkId);
+            } catch (IDCOServiceException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
             }
-            log.info("Submitting new main intent for network " + networkId);
-            intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkId);
-            database.addMainIntent(networkId, intentKey);
-            database.unlockNetwork(networkId);
-            log.info("Port " + networkEndpoint + " correctly added to "+ networkId);
         });
     }
 
     public Network getVirtualNetwork(String networkId) throws IDCOServiceException {
+        log.info("Manager tries to retrieve network " + networkId);
 
         Future<Network> future = genericEventHandler.submit(() -> {
             log.info("Retrieving network " + networkId);
-            database.lockNetwork(networkId);
-
-            Network network = database.getNetwork(networkId);
-            database.unlockNetwork(networkId);
-            return network;
+            return database.getNetwork(networkId);
+            
         });
 
         try {
-            return future.get();
-        } catch (Exception e) {
+            return future.get(30, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            log.error("Network doesn't exist");
+            return null;
+        } catch (Exception e){
+            log.error("Error retrieving network", e);
             return null;
         }
-
     }
 
     class ArpProxyPacketProcessor implements PacketProcessor {
 
-        public ArpProxyPacketProcessor() {
-
-        }
-
         @Override
         public void process(PacketContext context) {
-
             // Verify valid context
             if (context == null || context.isHandled()) {
                 return;
@@ -312,9 +304,7 @@ public class IDCOManager implements IDCOService {
         }
 
         public void processPacketInternal(PacketContext context) {
-
             Ethernet eth = context.inPacket().parsed();
-
             MacAddress dstMac = eth.getDestinationMAC();
             ConnectPoint heardPort = context.inPacket().receivedFrom();
 
@@ -323,37 +313,31 @@ public class IDCOManager implements IDCOService {
                 return;
             }
 
-            database.lockNetwork(mscsId);
-
-            if (!(dstMac.isBroadcast() || dstMac.isMulticast())) {
-                ConnectPoint hostLocation = database.getHostLocation(mscsId, dstMac);
-                if (hostLocation != null) {
-                    TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(hostLocation.port())
-                            .build();
-                    OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
-                            context.inPacket().unparsed());
-                    packetService.emit(outboundPacket);
-                    context.block();
-                    database.unlockNetwork(mscsId);
-                    return;
+                if (!(dstMac.isBroadcast() || dstMac.isMulticast())) {
+                    ConnectPoint hostLocation = database.getHostLocation(mscsId, dstMac);
+                    if (hostLocation != null) {
+                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                .setOutput(hostLocation.port())
+                                .build();
+                        OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
+                                context.inPacket().unparsed());
+                        packetService.emit(outboundPacket);
+                        context.block();
+                        return;
+                    }
                 }
 
-            }
+                Collection<ConnectPoint> connectPoints = database.getPortsOfNetworkGivenPort(heardPort);
+                connectPoints.forEach(point -> {
+                    TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
+                    OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
+                            context.inPacket().unparsed());
+                    packetService.emit(outboundPacket);
+                });
 
-            Collection<ConnectPoint> connectPoints = database.getPortsOfNetworkGivenPort(heardPort);
-
-            connectPoints.forEach(point -> {
-                TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
-                OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
-                        context.inPacket().unparsed());
-                packetService.emit(outboundPacket);
-            });
-
-            context.block();
-            log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId.toString());
-            database.unlockNetwork(mscsId);
+                context.block();
+                log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId);
         }
-
     }
 
     private class VNFLocationProvider implements PacketProcessor {
@@ -366,15 +350,14 @@ public class IDCOManager implements IDCOService {
             TrafficSelector.Builder selector = DefaultTrafficSelector.builder()
                     .matchEthType(Ethernet.TYPE_ARP);
             packetService.requestPackets(selector.build(), ARP_TO_CONTROLLER_PRIORITY, appId);
-
         }
 
         /**
          * Withdraw packet intercepts.
          */
         private void withdrawIntercepts() {
-            TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-            selector.matchEthType(Ethernet.TYPE_ARP);
+            TrafficSelector.Builder selector = DefaultTrafficSelector.builder()
+                    .matchEthType(Ethernet.TYPE_ARP);
             packetService.cancelPackets(selector.build(), ARP_TO_CONTROLLER_PRIORITY, appId);
         }
 
@@ -399,7 +382,6 @@ public class IDCOManager implements IDCOService {
 
         private void processPacketInternal(PacketContext context) {
             Ethernet eth = context.inPacket().parsed();
-
             ConnectPoint heardOn = context.inPacket().receivedFrom();
 
             // If this arrived on control port, bail out.
@@ -408,66 +390,63 @@ public class IDCOManager implements IDCOService {
             }
 
             MacAddress hostId = eth.getSourceMAC();
-
             if (eth.getEtherType() == Ethernet.TYPE_ARP) {
                 detectedHost(hostId, heardOn, context);
             }
         }
 
         public void detectedHost(MacAddress macAddress, ConnectPoint hostLocation, PacketContext context) {
-
             String mscsId = database.getNetworkIdForPort(hostLocation);
             if (mscsId == null) {
                 return;
             }
-            database.lockNetwork(mscsId);
-            log.info("New packet received: " + macAddress.toString() + " for network " + mscsId.toString());
+                log.info("New packet received: " + macAddress.toString() + " for network " + mscsId);
 
-            ConnectPoint lastLocation = database.getHostLocation(mscsId, macAddress);
+                ConnectPoint lastLocation = database.getHostLocation(mscsId, macAddress);
+                if (lastLocation != null) {
+                    if (!lastLocation.equals(hostLocation)) {
+                        log.warn("The host " + macAddress + " in network " + mscsId
+                                + " has changed its location. The system does not support host mobility");
+                    }
 
-            if (lastLocation != null) {
-                if (!lastLocation.equals(hostLocation)) {
-                    log.warn("The host " + macAddress.toString() + " in network " + mscsId
-                            + " has changed its location. The system does not supporthost mobility");
+                    return;
                 }
-                database.unlockNetwork(mscsId);
-                return;
-            }
 
-            Long tunnelId = database.getTunnelIdOfPort(hostLocation);
-            if (tunnelId == null) {
-                context.block();
-                database.unlockNetwork(mscsId);
-                return;
-            }
+                Long tunnelId = database.getTunnelIdOfPort(hostLocation);
+                if (tunnelId == null) {
+                    context.block();
+                    return;
+                }
 
-            Collection<ConnectPoint> connectPoint = database.getPortsOfNetworkGivenPort(hostLocation);
+                Collection<ConnectPoint> connectPoint = database.getPortsOfNetworkGivenPort(hostLocation);
 
-            List<FlowRule> rules = connectPoint.stream()
-                    .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
-                    .collect(Collectors.toList());
+                List<FlowRule> rules = connectPoint.stream()
+                        .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
+                        .collect(Collectors.toList());
 
-            Key key = generateHostIntentKey(macAddress, mscsId);
+                Key key = generateHostIntentKey(macAddress, mscsId);
 
-            FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, key, rules,
-                    Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
+                FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, key, rules,
+                        Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
 
-            intentService.submit(ruleIntent);
-            database.addIntentToNetwork(mscsId, key);
-            database.setHostLocation(mscsId, macAddress, hostLocation);
-            database.unlockNetwork(mscsId);
+                intentService.submit(ruleIntent);
+                database.addIntentToNetwork(mscsId, key);
+                database.setHostLocation(mscsId, macAddress, hostLocation);
         }
 
         private FlowRule createRule(MacAddress address, ConnectPoint cp, ConnectPoint otherCp, long tunnelId) {
-            TrafficTreatment treatment = DefaultTrafficTreatment.builder().setTunnelId(tunnelId).transition(1).build();
-            TrafficSelector selector = DefaultTrafficSelector.builder().matchEthDst(address).matchInPort(otherCp.port())
-                    .build();
+            TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                    .setTunnelId(tunnelId).transition(1).build();
+            TrafficSelector selector = DefaultTrafficSelector.builder()
+                    .matchEthDst(address).matchInPort(otherCp.port()).build();
             return DefaultFlowRule.builder().fromApp(appId)
-                    .withPriority(VIRTUAL_NETWORK_EDGE_PRIORITY).withTreatment(treatment)
-                    .withSelector(selector).makePermanent().forDevice(otherCp.deviceId()).build();
-
+                    .withPriority(VIRTUAL_NETWORK_EDGE_PRIORITY)
+                    .withTreatment(treatment)
+                    .withSelector(selector)
+                    .makePermanent()
+                    .forDevice(otherCp.deviceId())
+                    .build();
         }
-
     }
 
     class CustomIntentListener implements IntentListener {
@@ -492,20 +471,17 @@ public class IDCOManager implements IDCOService {
                 default:
                     break;
             }
-
         }
     }
 
     /************ UTILS ***************************************/
 
     private Key generateHostIntentKey(MacAddress hostMac, String mscsId) {
-
-        return Key.of("idco-host-" + mscsId.toString() + "-" + hostMac.toString(), appId);
+        return Key.of("idco-host-" + mscsId + "-" + hostMac, appId);
     }
 
     /*
-     * We are not focusing on security in this implementation. Future
-     * implementations
+     * We are not focusing on security in this implementation. Future implementations
      * will include a more secure Tunnel Id provider.
      * TODO: check valid vxlan tunnels
      */
@@ -518,31 +494,28 @@ public class IDCOManager implements IDCOService {
          * - 2 is a factor of a - 1
          * - 4 is a factor of a - 1
          * 
-         * TODO: generate this values dinamically
+         * TODO: generate this values dynamically
          */
         private long c = 16777213;
         private long a = 258088 + 1;
         private long modulus = 16777216;
-        private long last_id;
+        private long lastId;
         private long count;
 
         public TunnelIdProvider() {
             IdGenerator generator = new IdGenerator();
-            this.last_id = generator.nextId();
+            this.lastId = generator.nextId();
             count = 0;
         }
 
         public Long getNewId() {
-            
-
             long id;
             if (count == modulus) {
                 return null;
             }
-            id = last_id;
-            this.last_id = (last_id * a + c) % modulus;
+            id = lastId;
+            this.lastId = (lastId * a + c) % modulus;
             count++;
-
             return id;
         }
 
@@ -556,5 +529,4 @@ public class IDCOManager implements IDCOService {
             }
         }
     }
-
 }

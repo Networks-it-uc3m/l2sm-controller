@@ -4,6 +4,7 @@ import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.l2sm.vnets.api.IDCOService;
+import org.l2sm.vnets.api.IDCOServiceException;
 import org.onosproject.cli.AbstractShellCommand;
 
 @Service
@@ -19,10 +20,11 @@ public class L2SMDeleteNetwork extends AbstractShellCommand {
         IDCOService idcoService = get(IDCOService.class);
         try {
             idcoService.deleteVirtualNetwork(networkId);
+            print("Network " + networkId + " deleted successfully.");
+        } catch (IDCOServiceException e) {
+            print("Error deleting network: " + e.getMessage());
         } catch (Exception e) {
-            print("Error ocurred");
-            print(e.toString());
+            print("Unexpected error occurred: " + e.toString());
         }
     }
-
 }

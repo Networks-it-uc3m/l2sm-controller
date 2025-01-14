@@ -4,12 +4,12 @@ import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.l2sm.vnets.api.IDCOService;
+import org.l2sm.vnets.api.IDCOServiceException;
 import org.l2sm.vnets.api.Network;
 import org.onosproject.cli.AbstractShellCommand;
 
 @Service
-@Command(scope = "onos", name = "l2sm-get-network", description = "Create a network")
-
+@Command(scope = "onos", name = "l2sm-get-network", description = "Retrieve a network")
 
 public class L2SMGetNetwork extends AbstractShellCommand {
 
@@ -21,15 +21,15 @@ public class L2SMGetNetwork extends AbstractShellCommand {
         IDCOService idcoService = get(IDCOService.class);
         try {
             Network network = idcoService.getVirtualNetwork(networkId);
-            if (network == null){
+            if (network == null) {
                 print("The network does not exist");
                 return;
             }
             print(network.toString());
+        } catch (IDCOServiceException e) {
+            print("Error retrieving network: " + e.getMessage());
         } catch (Exception e) {
-            print("Error ocurred");
-            print(e.toString());
+            print("Unexpected error occurred: " + e.toString());
         }
     }
-
 }

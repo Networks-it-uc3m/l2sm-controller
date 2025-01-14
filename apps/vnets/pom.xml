@@ -128,6 +128,11 @@
       <artifactId>jackson-databind</artifactId>
       <scope>provided</scope>
     </dependency>
+      <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+      <version>1.26</version>
+    </dependency>
 
      <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>
@@ -135,11 +140,7 @@
       <version>2.11.0</version>
     </dependency>
 
-    <dependency>
-      <groupId>org.yaml</groupId>
-      <artifactId>snakeyaml</artifactId>
-      <version>1.26</version>
-    </dependency>
+  
 
     <dependency>
       <groupId>org.onosproject</groupId>
@@ -165,6 +166,26 @@
           <skip>true</skip>
         </configuration>
       </plugin>
+        <!-- <plugin>
+  <groupId>org.apache.karaf.tooling</groupId>
+  <artifactId>karaf-maven-plugin</artifactId>
+  <version>4.2.9</version> 
+  <extensions>true</extensions>
+  <configuration>
+    <aggregateFeatures>true</aggregateFeatures>
+    <features>
+      <feature>
+        <name>${project.artifactId}</name>
+        <version>${project.version}</version>
+        <feature>onos-dependencies</feature> 
+        <bundle>mvn:org.yaml/snakeyaml/1.26</bundle>
+        <bundle>mvn:com.fasterxml.jackson.dataformat/jackson-dataformat-yaml/2.11.0</bundle>
+        <bundle>mvn:${project.groupId}/${project.artifactId}/${project.version}</bundle>
+      </feature>
+    </features>
+    <featuresFile>src/main/resources/features.xml</featuresFile>
+  </configuration>
+</plugin> -->
 
       <plugin>
         <groupId>org.apache.felix</groupId>
@@ -175,12 +196,23 @@
             <_wab>src/main/webapp/</_wab>
             <Include-Resource>WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
                             {maven-resources}</Include-Resource>
-            <Import-Package>!com.fasterxml.jackson.dataformat,!snakeyaml,*,org.glassfish.jersey.servlet</Import-Package>
+            <!-- <Import-Package>!snakeyaml,!com.fasterxml.jackson.dataformat,*,org.glassfish.jersey.servlet</Import-Package> -->
+              <!-- <Import-Package>!snakeyaml,!com.fasterxml.jackson.dataformat,*,org.glassfish.jersey.servlet</Import-Package> -->
+
+           <Import-Package>
+  org.glassfish.jersey.servlet,
+  com.fasterxml.jackson.dataformat.yaml;version="[2.11.0,2.12)",
+  *;resolution:=optional
+</Import-Package>
+
             <Web-ContextPath>${web.context}</Web-ContextPath>
-            <Embed-Dependency>jackson-dataformat-yaml, snakeyaml</Embed-Dependency>
+            <!-- <Embed-Dependency>snakeyaml,jackson-dataformat-yaml</Embed-Dependency> -->
           </instructions>
         </configuration>
       </plugin>
+
+    
+
     </plugins>
   </build>
 

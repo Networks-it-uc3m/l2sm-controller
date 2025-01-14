@@ -15,7 +15,6 @@
  */
 package org.l2sm.vnets.rest;
 
-
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -34,16 +33,18 @@ import org.l2sm.vnets.api.Network;
 import org.l2sm.vnets.dto.NetworkDTO;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.rest.AbstractWebResource;
-
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 
 /**
- * The Network MAnagement
+ * The Network Management API
  */
-@Path("/")
+@Path("/api")
 public class NetworkManagement extends AbstractWebResource {
 
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
-   private IDCOService idcoService = get(IDCOService.class);
+    private IDCOService idcoService = get(IDCOService.class);
 
     /**
      * Implementation of get a specific Network
@@ -52,46 +53,57 @@ public class NetworkManagement extends AbstractWebResource {
      */
     @GET
     @Path("/{networkId}")
-    @Produces({"application/yaml",MediaType.APPLICATION_JSON})
-    public Response getNetworkById(@PathParam("networkId") String networkId) throws Exception {
-        
-        Network network = idcoService.getVirtualNetwork(networkId);
+    @Produces({ "application/yaml", MediaType.APPLICATION_JSON })
+    public Response getNetworkById(@PathParam("networkId") String networkId) {
+        log.info("API Rest tries to retrieve network " + networkId);
 
-     
-        if(network==null) return Response.status(Status.NOT_FOUND).build();
+        try {
+            Network network = idcoService.getVirtualNetwork(networkId);
+            if (network == null) {
+                return Response.status(Status.NOT_FOUND).build();
+            }
+            return Response.status(Status.OK).entity(network.toString()).build();
+        } catch (IDCOServiceException e) {
+            log.error("Error retrieving network: " + networkId, e);
+            return Response.status(Status.NOT_FOUND).build();
+        } catch (Exception e) {
+            log.error("Unexpected error retrieving network: " + networkId, e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+        }
 
-        return Response.status(Status.OK).entity(network).build();
+
     }
 
-
-
-     /**
-     * The idco is up and running
+    /**
+     * The IDCO is up and running
      *
      * @return 200 OK
      */
     @GET
     @Path("/status")
-    public Response getStatus() throws Exception {
-            
+    public Response getStatus() {
         return Response.status(Status.OK).build();
     }
 
     /**
      * Implementation of the Create Network
      *
-     * 
      * @return 200 OK
      */
     @POST
-    @Consumes({"application/yaml",MediaType.APPLICATION_JSON})
-    public Response createNetwork(NetworkDTO networkDTO) throws Exception {        
-
-        idcoService.createVirtualNetwork(networkDTO.getNetworkId());
-
-        return Response.status(Status.NO_CONTENT).build();
+    @Consumes({ "application/yaml", MediaType.APPLICATION_JSON })
+    public Response createNetwork(NetworkDTO networkDTO) {
+        try {
+            idcoService.createVirtualNetwork(networkDTO.getNetworkId());
+            return Response.status(Status.NO_CONTENT).build();
+        } catch (IDCOServiceException e) {
+            log.error("Error creating network: " + networkDTO.getNetworkId(), e);
+            return Response.status(Status.CONFLICT).build();
+        } catch (Exception e) {
+            log.error("Unexpected error creating network: " + networkDTO.getNetworkId(), e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
-
 
     /**
      * Implementation of the Terminate Network operation
@@ -100,42 +112,44 @@ public class NetworkManagement extends AbstractWebResource {
      */
     @DELETE
     @Path("/{networkId}")
-    public Response deleteNetwork(@PathParam("networkId") String networkId) throws Exception {
-
-        idcoService.deleteVirtualNetwork(networkId);
-    
-        return Response.status(Status.NO_CONTENT).build();
+    public Response deleteNetwork(@PathParam("networkId") String networkId) {
+        try {
+            idcoService.deleteVirtualNetwork(networkId);
+            return Response.status(Status.NO_CONTENT).build();
+        } catch (IDCOServiceException e) {
+            log.error("Error deleting network: " + networkId, e);
+            return Response.status(Status.NOT_FOUND).build();
+        } catch (Exception e) {
+            log.error("Unexpected error deleting network: " + networkId, e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     /**
      * Implementation of the Add Port instruction
-     * 
+     *
      * @return 204 CREATED
      */
     @POST
     @Path("/port")
-    @Consumes({"application/yaml", MediaType.APPLICATION_JSON})
-    public Response createPort(NetworkDTO networkDTO) throws Exception {
-
+    @Consumes({ "application/yaml", MediaType.APPLICATION_JSON })
+    public Response createPort(NetworkDTO networkDTO) {
         String networkId = networkDTO.getNetworkId();
         try {
-            networkDTO.getNetworkEndpoints().forEach((networkEndpoint) -> {
+            networkDTO.getNetworkEndpoints().forEach(networkEndpoint -> {
                 try {
                     idcoService.addPort(networkId, ConnectPoint.deviceConnectPoint(networkEndpoint));
                 } catch (IDCOServiceException e) {
                     throw new WebApplicationException(Response.status(Status.CONFLICT).build());
                 }
             });
+            return Response.status(Status.NO_CONTENT).build();
         } catch (WebApplicationException e) {
-            return Response.status(Status.CONFLICT).build();
+            log.error("Error adding port to network: " + networkId, e);
+            return e.getResponse();
+        } catch (Exception e) {
+            log.error("Unexpected error adding port to network: " + networkId, e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build();
         }
-
-        return Response.status(Status.NO_CONTENT).build();
     }
-
-
-
-
-
-
 }
