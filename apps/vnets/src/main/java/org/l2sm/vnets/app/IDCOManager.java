@@ -48,6 +48,9 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
+// import org.onosproject.store.service.ConsistentMap;
+// import org.onosproject.store.service.StorageService;
+
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -90,6 +93,11 @@ public class IDCOManager implements IDCOService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected ObjectiveTrackerService objectiveTrackerService;
 
+    // @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    // protected StorageService storageService;
+
+    // private ConsistentMap<String, Integer> networkCuyito;
+
     private IDCODatabase database;
     private TunnelIdProvider tunnelIdProvider;
 
@@ -105,6 +113,12 @@ public class IDCOManager implements IDCOService {
     protected void activate() {
         log.info("Starting IDCO");
         appId = coreService.registerApplication("org.l2sm.vnets.app");
+
+        // networkCuyito = storageService.<String, Integer>consistentMapBuilder()
+        //         .withName("test-vnet-distributed")
+        //         .withApplicationId(appId)
+        //         .withPurgeOnUninstall()
+        //         .build();
 
         this.database = new IDCODatabase(log);
 
@@ -165,7 +179,12 @@ public class IDCOManager implements IDCOService {
         log.info("IDCO has stopped");
     }
 
+    public void createNetworkCuyito(String networkId) {
+        // networkCuyito.put(networkId,5);
+    }
+
     public void createVirtualNetwork(String networkId) throws IDCOServiceException {
+      
         genericEventHandler.submit(() -> {
             log.info("Creating network: " + networkId);
             try {
@@ -182,7 +201,13 @@ public class IDCOManager implements IDCOService {
         });
     }
 
+    public void deleteNetworkCuyito(String networkId) {
+        // networkCuyito.remove(networkId);
+
+    }
+
     public void deleteVirtualNetwork(String networkId) throws IDCOServiceException {
+
         genericEventHandler.submit(() -> {
             log.info("Deleting network " + networkId);
             try {
@@ -284,6 +309,11 @@ public class IDCOManager implements IDCOService {
             log.error("Error retrieving network", e);
             return null;
         }
+    }
+    public Integer getNetworkCuyito(String networkId) {
+        
+        return new Integer(7);
+        // return networkCuyito.get(networkId).value();
     }
 
     class ArpProxyPacketProcessor implements PacketProcessor {
