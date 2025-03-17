@@ -85,9 +85,19 @@
 //      */
 //     @POST
 //     @Consumes({"application/yaml",MediaType.APPLICATION_JSON})
-//     public Response createNetwork(NetworkDTO networkDTO) throws Exception {        
+//     public Response createNetwork(NetworkDTO networkDTO) throws Exception {
+        
+//         String networkVlinkId = networkDTO.getNetworkId();
+//         String FromEndPoint = networkDTO.getFromEndPoint();
+//         String ToEndPoint = networkDTO.getToEndPoint();
+//         String [] vLinkPath = networkDTO.getvLinkPath();
 
-//         idcoVLinkService.createVLinkNetwork(networkDTO.getNetworkId());
+//         try {
+//             idcoVLinkService.createVLinkNetwork(networkVlinkId, ConnectPoint.deviceConnectPoint(FromEndPoint), ConnectPoint.deviceConnectPoint(ToEndPoint), vLinkPath); 
+            
+//         } catch (IDCOVLinkServiceException e){
+//             throw new WebApplicationException(Response.status(Status.CONFLICT).build());
+//         }
 
 //         return Response.status(Status.NO_CONTENT).build();
 //     }
@@ -106,36 +116,5 @@
     
 //         return Response.status(Status.NO_CONTENT).build();
 //     }
-
-//     /**
-//      * Implementation of the Add Port instruction
-//      * 
-//      * @return 204 CREATED
-//      */
-//     @POST
-//     @Path("/port")
-//     @Consumes({"application/yaml", MediaType.APPLICATION_JSON})
-//     public Response createPort(NetworkDTO networkDTO) throws Exception {
-
-//         String networkVlinkId = networkDTO.getNetworkId();
-//         try {
-//             networkDTO.getNetworkEndpoints().forEach((networkVlinkEndpoint) -> {
-//                 try {
-//                     idcoVLinkService.addVLinkPort(networkVlinkId, ConnectPoint.deviceConnectPoint(networkVlinkEndpoint));
-//                 } catch (IDCOVLinkServiceException e) {
-//                     throw new WebApplicationException(Response.status(Status.CONFLICT).build());
-//                 }
-//             });
-//         } catch (WebApplicationException e) {
-//             return Response.status(Status.CONFLICT).build();
-//         }
-
-//         return Response.status(Status.NO_CONTENT).build();
-//     }
-
-
-
-
-
 
 // }
