@@ -180,7 +180,7 @@ public class IDCOManager implements IDCOService {
     }
 
     public void createNetworkCuyito(String networkId) {
-        // networkCuyito.put(networkId,5);
+        networkStorage.putIfAbsent(networkId,new Network(networkId));
     }
 
     public void createVirtualNetwork(String networkId) throws IDCOServiceException {

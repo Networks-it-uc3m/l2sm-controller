@@ -21,6 +21,13 @@ public class Network {
         this.networkEndpoints = new ArrayList<>();
         this.tunnelIds = new ArrayList<>();
     }
+    public Network(String networkId) {
+
+        this.networkId = networkId;
+        this.networkEndpoints = new ArrayList<>();
+        this.tunnelIds = new ArrayList<>();
+    }
+
 
  
     public List<ConnectPoint> getNetworkEndpoints() {
