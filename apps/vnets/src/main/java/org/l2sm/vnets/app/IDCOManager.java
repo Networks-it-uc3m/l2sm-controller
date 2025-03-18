@@ -102,7 +102,7 @@ public class IDCOManager implements IDCOService {
     private ConsistentMap<String, Network> networkStorage;
 
     private ConsistentMap<String, Collection<Key>> intentStorage;
-
+    
     private IDCODatabase database;
     private TunnelIdProvider tunnelIdProvider;
 
@@ -153,6 +153,8 @@ public class IDCOManager implements IDCOService {
 
         log.info("IDCO was started");
 
+
+
     }
 
     @Deactivate
@@ -197,6 +199,7 @@ public class IDCOManager implements IDCOService {
         networkStorage.putIfAbsent(networkId,new Network(networkId));
     }
 
+   
 
     public void deleteVirtualNetwork(String networkId) {
     
@@ -205,105 +208,89 @@ public class IDCOManager implements IDCOService {
         } else {
             Collection<Key> netIntent = intentStorage.get(networkId).value();
         
-                log.info("Deleting intents for network " + networkId);
-                netIntent.forEach(intentKey -> {
-                    Intent intent = intentService.getIntent(intentKey);
-                    if (intent != null) {
-                        intentService.withdraw(intent);
-                    }
-                });
+            log.info("Deleting intents for network " + networkId);
+            netIntent.forEach(intentKey -> {
+                Intent intent = intentService.getIntent(intentKey);
+                if (intent != null) {
+                    intentService.withdraw(intent);
+                }
+            });
         }
         
         log.info("Deleting network " + networkId + " from the storage");
         networkStorage.remove(networkId);
-                log.info("The network with id \"" + networkId + "\" has been deleted");
+        log.info("The network with id \"" + networkId + "\" has been deleted");
        
 
     }
 
 
+
     public void addPort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Adding port " + networkEndpoint.toString() + " to network " + networkId);
-            try {
-                if (!database.networkExists(networkId)) {
-                    throw new IDCOServiceException("The network does not exist");
-                }
+        log.info("Adding port " + networkEndpoint.toString() + " to network " + networkId);
+        if (!networkStorage.containsKey(networkId)) {
+            throw new IDCOServiceException("The network does not exist");
+        }
 
-                Long tunnelId = tunnelIdProvider.getNewId();
-                log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
-                database.addPortToNetwork(networkId, networkEndpoint, tunnelId);
-                log.info("Port " + networkEndpoint + " in network " + networkId + " added to the database");
+        Long tunnelId = tunnelIdProvider.getNewId();
+        log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
+        Network network = networkStorage.compute(networkId, (key,oldNetwork) ->{
+            oldNetwork.networkEndpoints.add(networkEndpoint);
+            oldNetwork.tunnelIds.add(tunnelId);
+            return oldNetwork;
+        }).value();
 
-                Network network = database.getNetwork(networkId);
-                int size = network.getNetworkEndpoints().size();
+        log.info("Port " + networkEndpoint + " in network " + networkId + " added to the database");
 
-                ConnectPoint[] netCps = new ConnectPoint[size];
-                network.getNetworkEndpoints().toArray(netCps);
-                long[] ids = Longs.toArray(network.getIds());
+        int size = network.getNetworkEndpoints().size();
 
-                Intent intent = null;
-                Key intentKey = Key.of("idco-main-" + networkId, appId);
-                log.info("Creating main intent for network " + networkId);
-                if (size == 1) {
-                    log.info("Network has only one port, no intent is created");
-                } else if (size == 2) {
-                    log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
-                    intent = VirtualLinkIntent.builder()
-                            .key(intentKey)
-                            .appId(appId)
-                            .one(netCps[0])
-                            .two(netCps[1])
-                            .priority(VIRTUAL_LINK_PRIORITY)
-                            .tunnelID(ids[0])
-                            .build();
-                } else {
-                    log.info("Creating virtual network intent");
-                    intent = VirtualNetworkIntent.builder()
-                            .key(intentKey)
-                            .appId(appId)
-                            .connectPoints(netCps)
-                            .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
-                            .tunnelIDs(ids)
-                            .build();
-                }
-                if (intent != null) {
-                    log.info("Submitting new main intent for network " + networkId);
-                    intentService.submit(intent);
-                    log.info("Adding main intent to database for the network " + networkId);
-                    database.addMainIntent(networkId, intentKey);
-                }
-                log.info("Port " + networkEndpoint + " correctly added to " + networkId);
-            } catch (IDCOServiceException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        });
+        ConnectPoint[] netCps = new ConnectPoint[size];
+        network.getNetworkEndpoints().toArray(netCps);
+        long[] ids = Longs.toArray(network.getIds());
+
+        Intent intent = null;
+        Key intentKey = Key.of("idco-main-" + networkId, appId);
+        log.info("Creating main intent for network " + networkId);
+        if (size == 1) {
+            log.info("Network has only one port, no intent is created");
+        } else if (size == 2) {
+            log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
+            intent = VirtualLinkIntent.builder()
+                    .key(intentKey)
+                    .appId(appId)
+                    .one(netCps[0])
+                    .two(netCps[1])
+                    .priority(VIRTUAL_LINK_PRIORITY)
+                    .tunnelID(ids[0])
+                    .build();
+        } else {
+            log.info("Creating virtual network intent");
+            intent = VirtualNetworkIntent.builder()
+                    .key(intentKey)
+                    .appId(appId)
+                    .connectPoints(netCps)
+                    .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
+                    .tunnelIDs(ids)
+                    .build();
+        }
+        if (intent != null) {
+            log.info("Submitting new main intent for network " + networkId);
+            intentService.submit(intent);
+            log.info("Adding main intent to database for the network " + networkId);
+            intentStorage.putIfAbsent(networkId, intentKey);
+            database.addMainIntent(networkId, intentKey);
+        }
+        log.info("Port " + networkEndpoint + " correctly added to " + networkId);
+          
     }
 
-    public Network getVirtualNetwork(String networkId) throws IDCOServiceException {
-        log.info("Manager tries to retrieve network " + networkId);
-
-        Future<Network> future = genericEventHandler.submit(() -> {
-            log.info("Retrieving network " + networkId);
-            return database.getNetwork(networkId);
-            
-        });
-
-        try {
-            return future.get(30, TimeUnit.SECONDS);
-        } catch (ExecutionException e) {
-            log.error("Network doesn't exist");
-            return null;
-        } catch (Exception e){
-            log.error("Error retrieving network", e);
+    public Network getVirtualNetwork(String networkId) {
+        if(!networkStorage.containsKey(networkId)) {
+            log.info("Network " + networkId + " doesn't exist.");
             return null;
         }
-    }
-    public Integer getNetworkCuyito(String networkId) {
-        
-        return new Integer(7);
-        // return networkCuyito.get(networkId).value();
+
+        return networkStorage.get(networkId).value();
     }
 
     class ArpProxyPacketProcessor implements PacketProcessor {
@@ -416,6 +403,7 @@ public class IDCOManager implements IDCOService {
         }
 
         public void detectedHost(MacAddress macAddress, ConnectPoint hostLocation, PacketContext context) {
+            
             String mscsId = database.getNetworkIdForPort(hostLocation);
             if (mscsId == null) {
                 return;
