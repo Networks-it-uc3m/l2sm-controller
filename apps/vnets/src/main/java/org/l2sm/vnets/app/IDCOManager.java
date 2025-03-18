@@ -197,38 +197,14 @@ public class IDCOManager implements IDCOService {
         networkStorage.putIfAbsent(networkId,new Network(networkId));
     }
 
-    public void createVirtualNetwork(String networkId) throws IDCOServiceException {
-      
-        genericEventHandler.submit(() -> {
-            log.info("Creating network: " + networkId);
-            try {
-                if (database.networkExists(networkId)) {
-                    throw new IDCOServiceException("The network already exists");
-                }
-                log.info("Registering new network");
-                database.registerNetwork(networkId);
-                log.info("The network " + networkId + " was correctly created");
-            } catch (IDCOServiceException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } 
-        });
-    }
 
-    public void deleteNetworkCuyito(String networkId) {
-        // networkCuyito.remove(networkId);
-
-    }
-
-    public void deleteVirtualNetwork(String networkId) throws IDCOServiceException {
-
-        genericEventHandler.submit(() -> {
-            log.info("Deleting network " + networkId);
-            try {
-                Collection<Key> netIntent = database.getNetworkIntents(networkId);
-                if (netIntent == null) {
-                    throw new IDCOServiceException("The network does not exist");
-                }
+    public void deleteVirtualNetwork(String networkId) {
+    
+        if(!intentStorage.containsKey(networkId)) {
+            log.info("Network "+ networkId + " doesn't have any intents to delete");
+        } else {
+            Collection<Key> netIntent = intentStorage.get(networkId).value();
+        
                 log.info("Deleting intents for network " + networkId);
                 netIntent.forEach(intentKey -> {
                     Intent intent = intentService.getIntent(intentKey);
@@ -236,15 +212,15 @@ public class IDCOManager implements IDCOService {
                         intentService.withdraw(intent);
                     }
                 });
-                log.info("Deleting network " + networkId + " from the database");
-                database.deleteNetwork(networkId);
+        }
+        
+        log.info("Deleting network " + networkId + " from the storage");
+        networkStorage.remove(networkId);
                 log.info("The network with id \"" + networkId + "\" has been deleted");
-            } catch (IDCOServiceException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } 
-        });
+       
+
     }
+
 
     public void addPort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
         genericEventHandler.submit(() -> {
