@@ -10,7 +10,7 @@ public interface IDCOService {
 
     public void deleteNetworkCuyito(String networkId);
 
-    public Integer getNetworkCuyito(String networkId);
+    public Network getNetworkCuyito(String networkId);
 
     public void deleteVirtualNetwork(String networkId) throws IDCOServiceException;
 
