@@ -22,6 +22,7 @@ import org.l2sm.vnets.net.VirtualLinkIntent;
 import org.l2sm.vnets.net.VirtualNetworkIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
+import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -48,8 +49,10 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
-// import org.onosproject.store.service.ConsistentMap;
-// import org.onosproject.store.service.StorageService;
+import org.onosproject.store.serializers.KryoNamespaces;
+import org.onosproject.store.service.ConsistentMap;
+import org.onosproject.store.service.StorageService;
+import org.onosproject.store.service.Serializer;
 
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -93,10 +96,12 @@ public class IDCOManager implements IDCOService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected ObjectiveTrackerService objectiveTrackerService;
 
-    // @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    // protected StorageService storageService;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected StorageService storageService;
 
-    // private ConsistentMap<String, Integer> networkCuyito;
+    private ConsistentMap<String, Network> networkStorage;
+
+    private ConsistentMap<String, Collection<Key>> intentStorage;
 
     private IDCODatabase database;
     private TunnelIdProvider tunnelIdProvider;
@@ -114,11 +119,20 @@ public class IDCOManager implements IDCOService {
         log.info("Starting IDCO");
         appId = coreService.registerApplication("org.l2sm.vnets.app");
 
-        // networkCuyito = storageService.<String, Integer>consistentMapBuilder()
-        //         .withName("test-vnet-distributed")
-        //         .withApplicationId(appId)
-        //         .withPurgeOnUninstall()
-        //         .build();
+    
+        networkStorage = storageService.<String, Network>consistentMapBuilder()
+            .withName("network-storage")
+            .withApplicationId(appId)
+            .withSerializer(Serializer.using(KryoNamespaces.API)) 
+            .withPurgeOnUninstall()
+            .build();
+
+        intentStorage = storageService.<String, Collection<Key>>consistentMapBuilder()
+            .withName("intent-storage")
+            .withApplicationId(appId)
+            .withSerializer(Serializer.using(KryoNamespaces.API)) 
+            .withPurgeOnUninstall()
+            .build();
 
         this.database = new IDCODatabase(log);
 
