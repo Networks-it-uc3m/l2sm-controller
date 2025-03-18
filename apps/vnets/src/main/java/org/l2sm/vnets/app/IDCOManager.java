@@ -193,7 +193,7 @@ public class IDCOManager implements IDCOService {
         log.info("IDCO has stopped");
     }
 
-    public void createNetworkCuyito(String networkId) {
+    public void createVirtualNetwork(String networkId) {
         networkStorage.putIfAbsent(networkId,new Network(networkId));
     }
 
