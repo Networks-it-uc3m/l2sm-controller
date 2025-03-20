@@ -6,11 +6,7 @@ public interface IDCOService {
 
     public void createVirtualNetwork(String networkId) throws IDCOServiceException;
 
-    public void createNetworkCuyito(String networkId);
 
-    public void deleteNetworkCuyito(String networkId);
-
-    public Network getNetworkCuyito(String networkId);
 
     public void deleteVirtualNetwork(String networkId) throws IDCOServiceException;
 
