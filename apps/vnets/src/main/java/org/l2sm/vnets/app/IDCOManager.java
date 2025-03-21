@@ -7,10 +7,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -22,7 +21,6 @@ import org.l2sm.vnets.net.VirtualLinkIntent;
 import org.l2sm.vnets.net.VirtualNetworkIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
-import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -100,7 +98,7 @@ public class IDCOManager implements IDCOService {
     protected StorageService storageService;
 
     private ConsistentMap<String, Network> networkStorage;
-
+    
     private ConsistentMap<ConnectPoint, Port> connectionPointStorage;
 
     private ConsistentMap<MacCompositeKey, ConnectPoint> macStorage;
@@ -166,8 +164,9 @@ public class IDCOManager implements IDCOService {
         
         
     }
-    private TunnelIdProvider tunnelIdProvider;
 
+    private TunnelIdProvider tunnelIdProvider;
+ 
     private ArpProxyPacketProcessor packetProcessor;
     private VNFLocationProvider vnfLocationProvider;
     private CustomIntentListener intentListener;
@@ -189,12 +188,14 @@ public class IDCOManager implements IDCOService {
             .withPurgeOnUninstall()
             .build();
 
+
         connectionPointStorage = storageService.<ConnectPoint, Port>consistentMapBuilder()
             .withName("connection-point-storage")
             .withApplicationId(appId)
             .withSerializer(Serializer.using(KryoNamespaces.API)) 
             .withPurgeOnUninstall()
             .build();
+
         macStorage = storageService.<MacCompositeKey, ConnectPoint>consistentMapBuilder()
             .withName("mac-storage")
             .withApplicationId(appId)
@@ -202,7 +203,7 @@ public class IDCOManager implements IDCOService {
             .withPurgeOnUninstall()
             .build();
 
-        this.database = new IDCODatabase(log);
+
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -253,10 +254,10 @@ public class IDCOManager implements IDCOService {
         networkStorage.stream().forEach(networkCons -> {
             Network network = networkCons.getValue().value();
             network.getIntents().forEach(intentKey -> {
-            Intent intent = intentService.getIntent(intentKey);
-            if (intent != null) {
-                intentService.withdraw(intent);
-            }
+                Intent intent = intentService.getIntent(intentKey);
+                if (intent != null) {
+                    intentService.withdraw(intent);
+                }
             });
         });
         
@@ -284,7 +285,7 @@ public class IDCOManager implements IDCOService {
             return;
         }
         Network network = networkStorage.get(networkId).value();
-    
+
         if(network.getIntents().isEmpty()) {
             log.info("Network "+ networkId + " doesn't have any intents to delete");
         } else {
@@ -295,7 +296,7 @@ public class IDCOManager implements IDCOService {
                 if (intent != null) {
                     intentService.withdraw(intent);
                 }
-            });
+            }); 
         }
         if(!network.getNetworkEndpoints().isEmpty()) {
             network.getNetworkEndpoints().forEach(networkEndpoint -> {
@@ -312,7 +313,7 @@ public class IDCOManager implements IDCOService {
         macKeysToRemove.forEach(k -> macStorage.remove(k));
         networkStorage.remove(networkId);
         log.info("The network with id \"" + networkId + "\" has been deleted");
-
+       
     }
 
 
@@ -414,29 +415,29 @@ public class IDCOManager implements IDCOService {
             MacCompositeKey macKey = new MacCompositeKey(mscsId,dstMac);
             if (!(dstMac.isBroadcast() || dstMac.isMulticast()) && macStorage.containsKey(macKey)) {
                 ConnectPoint hostLocation = macStorage.get(macKey).value();
-                        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                                .setOutput(hostLocation.port())
-                                .build();
-                        OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
-                                context.inPacket().unparsed());
-                        packetService.emit(outboundPacket);
-                        context.block();
-                        return;
-                    }
+                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                        .setOutput(hostLocation.port())
+                        .build();
+                OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
+                        context.inPacket().unparsed());
+                packetService.emit(outboundPacket);
+                context.block();
+                return;
+            }
 
             Collection<ConnectPoint> connectPoints = Collections.emptySet();
             if(networkStorage.containsKey(mscsId)) {
                 connectPoints = networkStorage.get(mscsId).value().getNetworkEndpoints().stream().filter(p -> !p.equals(heardPort)).collect(Collectors.toSet());
-                }
-                connectPoints.forEach(point -> {
-                    TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
-                    OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
-                            context.inPacket().unparsed());
-                    packetService.emit(outboundPacket);
-                });
+            }
+            connectPoints.forEach(point -> {
+                TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
+                OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
+                        context.inPacket().unparsed());
+                packetService.emit(outboundPacket);
+            });
 
-                context.block();
-                log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId);
+            context.block();
+            log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId);
         }
     }
 
@@ -501,29 +502,29 @@ public class IDCOManager implements IDCOService {
             }
             String mscsId = connectionPointStorage.get(hostLocation).value().getNetworkId();
 
-                log.info("New packet received: " + macAddress.toString() + " for network " + mscsId);
+            log.info("New packet received: " + macAddress.toString() + " for network " + mscsId);
 
             MacCompositeKey macKey = new MacCompositeKey(mscsId, macAddress);
 
             if (macStorage.containsKey(macKey)) {
                 ConnectPoint lastLocation = macStorage.get(macKey).value();
-                    if (!lastLocation.equals(hostLocation)) {
-                        log.warn("The host " + macAddress + " in network " + mscsId
-                                + " has changed its location. The system does not support host mobility");
-                    }
-                    return;
+                if (!lastLocation.equals(hostLocation)) {
+                    log.warn("The host " + macAddress + " in network " + mscsId
+                            + " has changed its location. The system does not support host mobility");
                 }
-
+                return;
+            }
+            
             if(!connectionPointStorage.containsKey(hostLocation)) {
                 context.block();
                 return; 
             } 
             Long tunnelId = connectionPointStorage.get(hostLocation).value().getTunnelId();
 
-                if (tunnelId == null) {
-                    context.block();
-                    return;
-                }
+            if (tunnelId == null) {
+                context.block();
+                return;
+            }
 
             Collection<ConnectPoint> connectPoints = Collections.emptySet();
             if(networkStorage.containsKey(mscsId)) {
@@ -531,15 +532,15 @@ public class IDCOManager implements IDCOService {
             }
 
             List<FlowRule> rules = connectPoints.stream()
-                        .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
-                        .collect(Collectors.toList());
+                    .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
+                    .collect(Collectors.toList());
 
             Key intentKey = generateHostIntentKey(macAddress, mscsId);
 
             FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
-                        Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
+                    Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
 
-                intentService.submit(ruleIntent);
+            intentService.submit(ruleIntent);
             networkStorage.compute(mscsId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
