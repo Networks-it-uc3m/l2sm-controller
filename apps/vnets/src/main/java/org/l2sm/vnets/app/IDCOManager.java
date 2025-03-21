@@ -103,6 +103,7 @@ public class IDCOManager implements IDCOService {
 
     private ConsistentMap<ConnectPoint, Port> connectionPointStorage;
 
+    private ConsistentMap<MacCompositeKey, ConnectPoint> macStorage;
 
     private static class Port {
         private String networkId;
