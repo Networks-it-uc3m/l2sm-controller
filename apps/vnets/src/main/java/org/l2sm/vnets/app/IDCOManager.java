@@ -262,6 +262,7 @@ public class IDCOManager implements IDCOService {
         
 
         log.info("Clearing database");
+        networkStorage.clear();
         macStorage.clear();
         connectionPointStorage.clear();
 
@@ -277,6 +278,12 @@ public class IDCOManager implements IDCOService {
    
 
     public void deleteVirtualNetwork(String networkId) {
+    
+        if(!networkStorage.containsKey(networkId)) {
+            log.info("Network "+ networkId + " doesn't exist");
+            return;
+        }
+        Network network = networkStorage.get(networkId).value();
     
         if(network.getIntents().isEmpty()) {
             log.info("Network "+ networkId + " doesn't have any intents to delete");
