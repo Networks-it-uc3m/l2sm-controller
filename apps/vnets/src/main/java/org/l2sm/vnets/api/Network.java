@@ -1,9 +1,12 @@
 package org.l2sm.vnets.api;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.intent.Key;
 
 
 
@@ -14,22 +17,35 @@ public class Network {
     public String networkId;
     public List<ConnectPoint> networkEndpoints;
     public List<Long> tunnelIds;
+    private Set<Key> intents;
     
 
     public Network() {
 
         this.networkEndpoints = new ArrayList<>();
         this.tunnelIds = new ArrayList<>();
+        this.intents = new  HashSet<>();
     }
+
     public Network(String networkId) {
 
         this.networkId = networkId;
         this.networkEndpoints = new ArrayList<>();
         this.tunnelIds = new ArrayList<>();
+        this.intents = new  HashSet<>();
+
     }
 
 
  
+    public Set<Key> getIntents() {
+        return intents;
+    }
+
+    public void setIntents(Set<Key> intents) {
+        this.intents = intents;
+    }
+
     public List<ConnectPoint> getNetworkEndpoints() {
         return networkEndpoints;
     }

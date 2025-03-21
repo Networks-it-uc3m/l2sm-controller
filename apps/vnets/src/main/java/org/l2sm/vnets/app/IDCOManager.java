@@ -181,12 +181,17 @@ public class IDCOManager implements IDCOService {
         }
 
         log.info("Withdrawing all the intents");
-        database.getAllIntents().forEach(intentKey -> {
+
+        networkStorage.stream().forEach(networkCons -> {
+            Network network = networkCons.getValue().value();
+            network.getIntents().forEach(intentKey -> {
             Intent intent = intentService.getIntent(intentKey);
             if (intent != null) {
                 intentService.withdraw(intent);
             }
+            });
         });
+        
 
         log.info("Clearing database");
         database.cleanDatabases();
@@ -203,13 +208,12 @@ public class IDCOManager implements IDCOService {
 
     public void deleteVirtualNetwork(String networkId) {
     
-        if(!intentStorage.containsKey(networkId)) {
+        if(network.getIntents().isEmpty()) {
             log.info("Network "+ networkId + " doesn't have any intents to delete");
         } else {
-            Collection<Key> netIntent = intentStorage.get(networkId).value();
-        
             log.info("Deleting intents for network " + networkId);
-            netIntent.forEach(intentKey -> {
+
+           network.getIntents().forEach(intentKey -> {
                 Intent intent = intentService.getIntent(intentKey);
                 if (intent != null) {
                     intentService.withdraw(intent);
@@ -277,8 +281,7 @@ public class IDCOManager implements IDCOService {
             log.info("Submitting new main intent for network " + networkId);
             intentService.submit(intent);
             log.info("Adding main intent to database for the network " + networkId);
-            intentStorage.putIfAbsent(networkId, intentKey);
-            database.addMainIntent(networkId, intentKey);
+            network.getIntents().add(intentKey);
         }
         log.info("Port " + networkEndpoint + " correctly added to " + networkId);
           
@@ -434,12 +437,15 @@ public class IDCOManager implements IDCOService {
 
                 Key key = generateHostIntentKey(macAddress, mscsId);
 
-                FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, key, rules,
+            FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
                         Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
 
                 intentService.submit(ruleIntent);
-                database.addIntentToNetwork(mscsId, key);
-                database.setHostLocation(mscsId, macAddress, hostLocation);
+            networkStorage.compute(mscsId, (key,oldNetwork) ->{
+                oldNetwork.getIntents().add(intentKey);
+                return oldNetwork;
+            });
+            macStorage.put(macKey, hostLocation);
         }
 
         private FlowRule createRule(MacAddress address, ConnectPoint cp, ConnectPoint otherCp, long tunnelId) {
