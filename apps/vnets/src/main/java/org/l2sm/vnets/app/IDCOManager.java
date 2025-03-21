@@ -123,6 +123,48 @@ public class IDCOManager implements IDCOService {
        
         
     }
+
+    protected static class MacCompositeKey {
+        private final String networkId;
+        private final MacAddress mac;
+
+        public MacCompositeKey(String networkId, MacAddress mac) {
+            this.networkId = networkId;
+            this.mac = mac;
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((networkId == null) ? 0 : networkId.hashCode());
+            result = prime * result + ((mac == null) ? 0 : mac.hashCode());
+            return result;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            MacCompositeKey other = (MacCompositeKey) obj;
+            if (networkId == null) {
+                if (other.networkId != null)
+                    return false;
+            } else if (!networkId.equals(other.networkId))
+                return false;
+            if (mac == null) {
+                if (other.mac != null)
+                    return false;
+            } else if (!mac.equals(other.mac))
+                return false;
+            return true;
+        }
+    
+        
+        
+    }
     private TunnelIdProvider tunnelIdProvider;
 
     private ArpProxyPacketProcessor packetProcessor;
@@ -152,6 +194,8 @@ public class IDCOManager implements IDCOService {
             .withSerializer(Serializer.using(KryoNamespaces.API)) 
             .withPurgeOnUninstall()
             .build();
+        macStorage = storageService.<MacCompositeKey, ConnectPoint>consistentMapBuilder()
+            .withName("mac-storage")
             .withApplicationId(appId)
             .withSerializer(Serializer.using(KryoNamespaces.API)) 
             .withPurgeOnUninstall()
@@ -217,6 +261,7 @@ public class IDCOManager implements IDCOService {
         
 
         log.info("Clearing database");
+        macStorage.clear();
         connectionPointStorage.clear();
 
         intentService.removeListener(intentListener);
@@ -250,9 +295,15 @@ public class IDCOManager implements IDCOService {
             });
         }
         log.info("Deleting network " + networkId + " from the storage");
+        Set<MacCompositeKey> macKeysToRemove = macStorage.keySet()
+            .stream()
+            .filter(k -> k.networkId.equals(networkId))
+            .collect(Collectors.toSet());
+
+        // Now remove each one from macStorage
+        macKeysToRemove.forEach(k -> macStorage.remove(k));
         networkStorage.remove(networkId);
         log.info("The network with id \"" + networkId + "\" has been deleted");
-       
 
     }
 
@@ -352,6 +403,9 @@ public class IDCOManager implements IDCOService {
             }
             String mscsId = connectionPointStorage.get(heardPort).value().getNetworkId();
            
+            MacCompositeKey macKey = new MacCompositeKey(mscsId,dstMac);
+            if (!(dstMac.isBroadcast() || dstMac.isMulticast()) && macStorage.containsKey(macKey)) {
+                ConnectPoint hostLocation = macStorage.get(macKey).value();
                         TrafficTreatment treatment = DefaultTrafficTreatment.builder()
                                 .setOutput(hostLocation.port())
                                 .build();
@@ -361,6 +415,7 @@ public class IDCOManager implements IDCOService {
                         context.block();
                         return;
                     }
+
             Collection<ConnectPoint> connectPoints = Collections.emptySet();
             if(networkStorage.containsKey(mscsId)) {
                 connectPoints = networkStorage.get(mscsId).value().getNetworkEndpoints().stream().filter(p -> !p.equals(heardPort)).collect(Collectors.toSet());
@@ -440,13 +495,14 @@ public class IDCOManager implements IDCOService {
 
                 log.info("New packet received: " + macAddress.toString() + " for network " + mscsId);
 
-                ConnectPoint lastLocation = database.getHostLocation(mscsId, macAddress);
-                if (lastLocation != null) {
+            MacCompositeKey macKey = new MacCompositeKey(mscsId, macAddress);
+
+            if (macStorage.containsKey(macKey)) {
+                ConnectPoint lastLocation = macStorage.get(macKey).value();
                     if (!lastLocation.equals(hostLocation)) {
                         log.warn("The host " + macAddress + " in network " + mscsId
                                 + " has changed its location. The system does not support host mobility");
                     }
-
                     return;
                 }
 
