@@ -13,7 +13,7 @@ import pty
 import re
 import signal
 import select
-from distutils.version import StrictVersion
+from packaging.version import Version
 from re import findall
 from subprocess import Popen, PIPE
 from sys import exit  # pylint: disable=redefined-builtin
@@ -75,10 +75,9 @@ class CustomSwitch( Switch ):
         cls.OVSVersion = findall( r'\d+\.\d+', version )[ 0 ]
 
     @classmethod
-    def isOldOVS( cls ):
-        "Is OVS ersion < 1.10?"
-        return ( StrictVersion( cls.OVSVersion ) <
-                 StrictVersion( '1.10' ) )
+    def isOldOVS(cls):
+        """Is OVS version < 1.10?"""
+        return Version(cls.OVSVersion) < Version('1.10')
 
     def dpctl( self, *args ):
         "Run ovs-ofctl command"
@@ -261,7 +260,7 @@ def configure_switch(switch, controller_ip, controller_port, neighbors, switch_i
     switch.cmdPrint("ovs-vsctl set bridge brtun-" + switch.name + " protocols=OpenFlow13")
 
     target = "tcp:{}:{}".format(controller_ip, controller_port)
-    switch.cmdPrint("ovs-vsctl set-controller brtun-" + switch.name + " " + target)
+    # switch.cmdPrint("ovs-vsctl set-controller brtun-" + switch.name + " " + target)
     # Attach Ethernet interface
 
 
@@ -278,7 +277,7 @@ def configure_switch(switch, controller_ip, controller_port, neighbors, switch_i
                         switch.name, neighbor, switch.name, neighbor, switch_ips[switch.name], switch_ips[neighbor]))
 
 def demo2():
-    CONTROLLER_IP = "localhost"
+    CONTROLLER_IP = "172.17.0.5"
     CONTROLLER_PORT = 6633
 
     net = Mininet(controller=RemoteController)
@@ -303,7 +302,7 @@ def demo2():
     net.stop()
 
 def demo():
-    CONTROLLER_IP = "10.0.2.4"
+    CONTROLLER_IP = "172.17.0.5"
     CONTROLLER_PORT = 6633
 
     net = Mininet(controller=RemoteController)
