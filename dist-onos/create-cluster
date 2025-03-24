@@ -8,7 +8,7 @@ for i in {1..3}; do
 done
 
 # Create ONOS cluster using ONOS docker image
-ONOS_IMAGE=alexdecb/l2sm-controller:2.7
+ONOS_IMAGE=alexdecb/l2sm-controller:2.4
 for i in {1..3}; do
     echo "Setting up onos-$i..."
     docker container run --detach --name onos-$i --hostname onos-$i --restart=always $ONOS_IMAGE
