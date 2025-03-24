@@ -21,6 +21,7 @@ import org.l2sm.vnets.net.VirtualLinkIntent;
 import org.l2sm.vnets.net.VirtualNetworkIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
+import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -179,12 +180,17 @@ public class IDCOManager implements IDCOService {
     protected void activate() {
         log.info("Starting IDCO");
         appId = coreService.registerApplication("org.l2sm.vnets.app");
-
+        KryoNamespace.Builder serializer = KryoNamespace.newBuilder()
+        .register(KryoNamespaces.API)
+        .register(Network.class)
+        .register(ConnectPoint.class)
+        .register(MacCompositeKey.class)
+        .register(Port.class);
     
         networkStorage = storageService.<String, Network>consistentMapBuilder()
             .withName("network-storage")
             .withApplicationId(appId)
-            .withSerializer(Serializer.using(KryoNamespaces.API)) 
+            .withSerializer(Serializer.using(serializer.build()))
             .withPurgeOnUninstall()
             .build();
 
@@ -192,14 +198,14 @@ public class IDCOManager implements IDCOService {
         connectionPointStorage = storageService.<ConnectPoint, Port>consistentMapBuilder()
             .withName("connection-point-storage")
             .withApplicationId(appId)
-            .withSerializer(Serializer.using(KryoNamespaces.API)) 
+            .withSerializer(Serializer.using(serializer.build()))
             .withPurgeOnUninstall()
             .build();
 
         macStorage = storageService.<MacCompositeKey, ConnectPoint>consistentMapBuilder()
             .withName("mac-storage")
             .withApplicationId(appId)
-            .withSerializer(Serializer.using(KryoNamespaces.API)) 
+            .withSerializer(Serializer.using(serializer.build()))
             .withPurgeOnUninstall()
             .build();
 
