@@ -1,4 +1,15 @@
 #!/bin/bash
 
-docker kill $(docker ps -q)
-docker rm $(docker ps -qa)
+# Get all container IDs whose names start with 'onos-' or 'atomix-'
+containers=$(docker ps -a --filter "name=^/onos-" --filter "name=^/atomix-" -q)
+
+# Check if there are any matching containers
+if [ -n "$containers" ]; then
+  echo "Stopping containers: $containers"
+  docker kill $containers
+
+  echo "Removing containers: $containers"
+  docker rm $containers
+else
+  echo "No containers found matching 'onos-' or 'atomix-'"
+fi
