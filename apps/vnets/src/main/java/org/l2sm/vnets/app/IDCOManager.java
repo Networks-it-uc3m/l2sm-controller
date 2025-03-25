@@ -376,7 +376,10 @@ public class IDCOManager implements IDCOService {
             log.info("Submitting new main intent for network " + networkId);
             intentService.submit(intent);
             log.info("Adding main intent to database for the network " + networkId);
-            network.getIntents().add(intentKey);
+            networkStorage.compute(networkId, (key,oldNetwork) ->{
+                oldNetwork.getIntents().add(intentKey);
+                return oldNetwork;
+            });            
         }
         log.info("Port " + networkEndpoint + " correctly added to " + networkId);
           
