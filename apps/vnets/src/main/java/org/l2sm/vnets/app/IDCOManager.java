@@ -183,6 +183,8 @@ public class IDCOManager implements IDCOService {
         KryoNamespace.Builder serializer = KryoNamespace.newBuilder()
         .register(KryoNamespaces.API)
         .register(Network.class)
+        .register(VirtualNetworkIntent.class)
+        .register(VirtualLinkIntent.class)
         .register(ConnectPoint.class)
         .register(MacCompositeKey.class)
         .register(Port.class);
@@ -305,7 +307,10 @@ public class IDCOManager implements IDCOService {
             log.info("Deleting intents for network " + networkId);
 
            network.getIntents().forEach(intentKey -> {
+                log.debug("intent key: ", intentKey);
                 Intent intent = intentService.getIntent(intentKey);
+                log.debug("erasing intent: ", intent);
+        
                 if (intent != null) {
                     intentService.withdraw(intent);
                 }
@@ -397,7 +402,9 @@ public class IDCOManager implements IDCOService {
             log.info("Network " + networkId + " doesn't exist.");
             return null;
         }
-
+        Network network = networkStorage.get(networkId).value();
+        log.info(network.toString());
+        log.info(network.getIntents().toString());
         return networkStorage.get(networkId).value();
     }
 
