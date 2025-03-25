@@ -257,14 +257,21 @@ public class IDCOManager implements IDCOService {
 
         log.info("Withdrawing all the intents");
 
-        networkStorage.stream().forEach(networkCons -> {
-            Network network = networkCons.getValue().value();
-            network.getIntents().forEach(intentKey -> {
-                Intent intent = intentService.getIntent(intentKey);
-                if (intent != null) {
-                    intentService.withdraw(intent);
-                }
-            });
+        // networkStorage.stream().forEach(networkCons -> {
+        //     Network network = networkCons.getValue().value();
+        //     network.getIntents().forEach(intentKey -> {
+        //         Intent intent = intentService.getIntent(intentKey);
+        //         if (intent != null) {
+        //             intentService.withdraw(intent);
+        //         }
+        //     });
+        // });
+        intentService.getIntents().forEach(i -> {
+            log.info(i.toString());
+            if(i.appId() == appId) {
+                intentService.withdraw(i);
+                intentService.purge(i);
+            }
         });
         
 
