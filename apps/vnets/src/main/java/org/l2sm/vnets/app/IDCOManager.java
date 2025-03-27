@@ -1,13 +1,17 @@
 package org.l2sm.vnets.app;
 
 import static org.onlab.util.Tools.groupedThreads;
+import static org.onlab.util.Tools.log;
+import static org.onlab.util.Tools.toHex;
 
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +23,13 @@ import org.l2sm.vnets.api.IDCOServiceException;
 import org.l2sm.vnets.api.Network;
 import org.l2sm.vnets.net.VirtualLinkIntent;
 import org.l2sm.vnets.net.VirtualNetworkIntent;
+import org.l2sm.vnets.net.VirtualNetworkIntentService;
 import org.onlab.packet.Ethernet;
+import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onlab.util.KryoNamespace;
+import org.onosproject.cluster.ClusterService;
+import org.onosproject.cluster.ControllerNode;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -40,6 +48,7 @@ import org.onosproject.net.intent.IntentEvent;
 import org.onosproject.net.intent.IntentListener;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.Key;
+import org.onosproject.net.intent.MultiPointToSinglePointIntent;
 import org.onosproject.net.intent.ObjectiveTrackerService;
 import org.onosproject.net.intent.PathIntent;
 import org.onosproject.net.packet.DefaultOutboundPacket;
@@ -50,8 +59,13 @@ import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.ConsistentMap;
+import org.onosproject.store.service.DistributedPrimitive;
 import org.onosproject.store.service.StorageService;
+import org.onosproject.store.service.Versioned;
+import org.onosproject.store.service.WorkQueue;
 import org.onosproject.store.service.Serializer;
+import org.onosproject.intentsync.IntentSynchronizationService;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -66,6 +80,7 @@ import com.google.common.primitives.Longs;
 @Component(immediate = true)
 @Service
 public class IDCOManager implements IDCOService {
+    private static final int NUM_PARALLEL_JOBS = 10;
 
     private static final int VIRTUAL_LINK_PRIORITY = PacketPriority.HIGH3.priorityValue();
     private static final PacketPriority ARP_TO_CONTROLLER_PRIORITY = PacketPriority.HIGH2;
@@ -81,7 +96,7 @@ public class IDCOManager implements IDCOService {
     protected PacketService packetService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
-    protected IntentService intentService;
+    protected VirtualNetworkIntentService virtualIntentsService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected DeviceService deviceService;
@@ -97,6 +112,15 @@ public class IDCOManager implements IDCOService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected StorageService storageService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected ClusterService clusterService;
+
+    private ConsistentMap<Key, Intent> intentStorage;
+
+    private WorkQueue<Intent> intentQueue;
+    private ExecutorService intentsExecutor;
+
 
     private ConsistentMap<String, Network> networkStorage;
     
@@ -166,14 +190,15 @@ public class IDCOManager implements IDCOService {
         
     }
 
+
     private TunnelIdProvider tunnelIdProvider;
  
     private ArpProxyPacketProcessor packetProcessor;
     private VNFLocationProvider vnfLocationProvider;
-    private CustomIntentListener intentListener;
+    // private CustomIntentListener intentListener;
 
     private ExecutorService genericEventHandler;
-
+    
     private ApplicationId appId;
 
     @Activate
@@ -211,7 +236,16 @@ public class IDCOManager implements IDCOService {
             .withPurgeOnUninstall()
             .build();
 
+        intentStorage = storageService.<Key, Intent>consistentMapBuilder()
+            .withName("intent-storage")
+            .withApplicationId(appId)
+            .withSerializer(Serializer.using(serializer.build()))
+            .withPurgeOnUninstall()
+            .build();
 
+        // intentQueue = storageService.<Intent>getWorkQueue("l2sm-intent-queue", Serializer.using(serializer.build()));
+
+        // intentQueue.addStatusChangeListener(this::statusChange);
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -220,7 +254,7 @@ public class IDCOManager implements IDCOService {
         packetService.addProcessor(vnfLocationProvider, PacketProcessor.advisor(1));
 
         intentListener = new CustomIntentListener();
-        intentService.addListener(intentListener);
+        virtualIntentsService.addListener(intentListener);
 
         genericEventHandler = Executors.newFixedThreadPool(4, groupedThreads("idco/event-handler", "worker-%d", log));
 
@@ -231,9 +265,50 @@ public class IDCOManager implements IDCOService {
         log.info("IDCO was started");
 
 
-
     }
+    // private void statusChange(DistributedPrimitive.Status status) {
+    //     switch (status) {
+    //     case ACTIVE:
+    //         startProcessing();
+    //         break;
+    //     case SUSPENDED:
+    //         stopProcessing();
+    //         break;
+    //     case INACTIVE:
+    //     default:
+    //         break;
+    //     }
+    // }
+    // private void startProcessing() {
+    //     intentsExecutor = createExecutor();
 
+    //     intentQueue.registerTaskProcessor(this::createIntent, NUM_PARALLEL_JOBS, intentsExecutor);
+    // }
+    // protected ExecutorService createExecutor() {
+    //     return newSingleThreadExecutor(groupedThreads("onos/" + appId, "sync", log));
+    // }
+
+
+    // private void stopProcessing() {
+    //     intentQueue.stopProcessing();
+    // }
+
+    // private void createIntent(Intent intent) {
+    //     log.info("Creating intent {}", intent);
+    //     intent.
+    //     if (node.equals(clusterService.getLocalNode().id())) {
+    //         log.debug("Do not remove routes from local nodes {}", node);
+    //         return;
+    //     }
+
+    //     if (clusterService.getState(node) == ControllerNode.State.READY) {
+    //         log.debug("Do not remove routes from active nodes {}", node);
+    //         return;
+    //     }
+
+    //     log.debug("Withdrawing routes: {}", routes);
+    //     routeService.withdraw(routes);
+    // }
     @Deactivate
     protected void deactivate() {
         log.info("Starting the IDCO cleaning process");
@@ -262,19 +337,20 @@ public class IDCOManager implements IDCOService {
         // networkStorage.stream().forEach(networkCons -> {
         //     Network network = networkCons.getValue().value();
         //     network.getIntents().forEach(intentKey -> {
-        //         Intent intent = intentService.getIntent(intentKey);
+        //         Intent intent = intentSynchronizer.getIntent(intentKey);
         //         if (intent != null) {
-        //             intentService.withdraw(intent);
+        //             intentSynchronizer.withdraw(intent);
         //         }
         //     });
         // });
-        intentService.getIntents().forEach(i -> {
-            log.info(i.toString());
-            if(i.appId() == appId) {
-                intentService.withdraw(i);
-                intentService.purge(i);
-            }
-        });
+        intentSynchronizer.removeIntentsByAppId(appId);
+        // intentSynchronizer.getIntents().forEach(i -> {
+        //     log.info(i.toString());
+        //     if(i.appId() == appId) {
+        //         intentSynchronizer.withdraw(i);
+        //         intentSynchronizer.purge(i);
+        //     }
+        // });
         
 
         log.info("Clearing database");
@@ -282,7 +358,7 @@ public class IDCOManager implements IDCOService {
         macStorage.clear();
         connectionPointStorage.clear();
 
-        intentService.removeListener(intentListener);
+        // intentSynchronizer.removeListener(intentListener);
 
         log.info("IDCO has stopped");
     }
@@ -308,11 +384,12 @@ public class IDCOManager implements IDCOService {
 
            network.getIntents().forEach(intentKey -> {
                 log.debug("intent key: ", intentKey);
-                Intent intent = intentService.getIntent(intentKey);
+                Versioned<Intent> intent =  intentStorage.get(intentKey);
+
                 log.debug("erasing intent: ", intent);
         
                 if (intent != null) {
-                    intentService.withdraw(intent);
+                    intentSynchronizer.withdraw(intent.value());
                 }
             }); 
         }
@@ -386,7 +463,8 @@ public class IDCOManager implements IDCOService {
         }
         if (intent != null) {
             log.info("Submitting new main intent for network " + networkId);
-            intentService.submit(intent);
+            intentStorage.put(intentKey, intent);
+            intentSynchronizer.submit(intent);
             log.info("Adding main intent to database for the network " + networkId);
             networkStorage.compute(networkId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
@@ -562,8 +640,9 @@ public class IDCOManager implements IDCOService {
 
             FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
-
-            intentService.submit(ruleIntent);
+            
+            intentStorage.put(intentKey, ruleIntent);
+            intentSynchronizer.submit(ruleIntent);
             networkStorage.compute(mscsId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
@@ -586,30 +665,30 @@ public class IDCOManager implements IDCOService {
         }
     }
 
-    class CustomIntentListener implements IntentListener {
+    // class CustomIntentListener implements IntentListener {
 
-        @Override
-        public void event(IntentEvent event) {
-            genericEventHandler.submit(() -> handleEvent(event));
-        }
+    //     @Override
+    //     public void event(IntentEvent event) {
+    //         genericEventHandler.submit(() -> handleEvent(event));
+    //     }
 
-        public void handleEvent(IntentEvent event) {
-            Intent intent = event.subject();
-            log.info("Intent event: " + event.type().name());
-            switch (event.type()) {
-                case FAILED:
-                    // objectiveTrackerService.addTrackedResources(intent.key(), );
-                    break;
-                case INSTALLED:
-                    break;
-                case WITHDRAWN:
-                    intentService.purge(intent);
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
+    //     public void handleEvent(IntentEvent event) {
+    //         Intent intent = event.subject();
+    //         log.info("Intent event: " + event.type().name());
+    //         switch (event.type()) {
+    //             case FAILED:
+    //                 // objectiveTrackerService.addTrackedResources(intent.key(), );
+    //                 break;
+    //             case INSTALLED:
+    //                 break;
+    //             case WITHDRAWN:
+    //                 intentSynchronizer.purge(intent);
+    //                 break;
+    //             default:
+    //                 break;
+    //         }
+    //     }
+    // }
 
     /************ UTILS ***************************************/
 
