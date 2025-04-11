@@ -173,7 +173,7 @@ public class IDCOManager implements IDCOService {
     private CustomIntentListener intentListener;
 
     private ExecutorService genericEventHandler;
-
+    
     private ApplicationId appId;
 
     @Activate
@@ -231,9 +231,50 @@ public class IDCOManager implements IDCOService {
         log.info("IDCO was started");
 
 
-
     }
+    // private void statusChange(DistributedPrimitive.Status status) {
+    //     switch (status) {
+    //     case ACTIVE:
+    //         startProcessing();
+    //         break;
+    //     case SUSPENDED:
+    //         stopProcessing();
+    //         break;
+    //     case INACTIVE:
+    //     default:
+    //         break;
+    //     }
+    // }
+    // private void startProcessing() {
+    //     intentsExecutor = createExecutor();
 
+    //     intentQueue.registerTaskProcessor(this::createIntent, NUM_PARALLEL_JOBS, intentsExecutor);
+    // }
+    // protected ExecutorService createExecutor() {
+    //     return newSingleThreadExecutor(groupedThreads("onos/" + appId, "sync", log));
+    // }
+
+
+    // private void stopProcessing() {
+    //     intentQueue.stopProcessing();
+    // }
+
+    // private void createIntent(Intent intent) {
+    //     log.info("Creating intent {}", intent);
+    //     intent.
+    //     if (node.equals(clusterService.getLocalNode().id())) {
+    //         log.debug("Do not remove routes from local nodes {}", node);
+    //         return;
+    //     }
+
+    //     if (clusterService.getState(node) == ControllerNode.State.READY) {
+    //         log.debug("Do not remove routes from active nodes {}", node);
+    //         return;
+    //     }
+
+    //     log.debug("Withdrawing routes: {}", routes);
+    //     routeService.withdraw(routes);
+    // }
     @Deactivate
     protected void deactivate() {
         log.info("Starting the IDCO cleaning process");
@@ -262,19 +303,20 @@ public class IDCOManager implements IDCOService {
         // networkStorage.stream().forEach(networkCons -> {
         //     Network network = networkCons.getValue().value();
         //     network.getIntents().forEach(intentKey -> {
-        //         Intent intent = intentService.getIntent(intentKey);
+        //         Intent intent = intentSynchronizer.getIntent(intentKey);
         //         if (intent != null) {
-        //             intentService.withdraw(intent);
+        //             intentSynchronizer.withdraw(intent);
         //         }
         //     });
         // });
-        intentService.getIntents().forEach(i -> {
-            log.info(i.toString());
-            if(i.appId() == appId) {
-                intentService.withdraw(i);
-                intentService.purge(i);
-            }
-        });
+        intentSynchronizer.removeIntentsByAppId(appId);
+        // intentSynchronizer.getIntents().forEach(i -> {
+        //     log.info(i.toString());
+        //     if(i.appId() == appId) {
+        //         intentSynchronizer.withdraw(i);
+        //         intentSynchronizer.purge(i);
+        //     }
+        // });
         
 
         log.info("Clearing database");
@@ -282,7 +324,7 @@ public class IDCOManager implements IDCOService {
         macStorage.clear();
         connectionPointStorage.clear();
 
-        intentService.removeListener(intentListener);
+        // intentSynchronizer.removeListener(intentListener);
 
         log.info("IDCO has stopped");
     }
@@ -308,11 +350,12 @@ public class IDCOManager implements IDCOService {
 
            network.getIntents().forEach(intentKey -> {
                 log.debug("intent key: ", intentKey);
-                Intent intent = intentService.getIntent(intentKey);
+                Versioned<Intent> intent =  intentStorage.get(intentKey);
+
                 log.debug("erasing intent: ", intent);
         
                 if (intent != null) {
-                    intentService.withdraw(intent);
+                    intentSynchronizer.withdraw(intent.value());
                 }
             }); 
         }
@@ -386,7 +429,8 @@ public class IDCOManager implements IDCOService {
         }
         if (intent != null) {
             log.info("Submitting new main intent for network " + networkId);
-            intentService.submit(intent);
+            intentStorage.put(intentKey, intent);
+            intentSynchronizer.submit(intent);
             log.info("Adding main intent to database for the network " + networkId);
             networkStorage.compute(networkId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
@@ -562,8 +606,9 @@ public class IDCOManager implements IDCOService {
 
             FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
-
-            intentService.submit(ruleIntent);
+            
+            intentStorage.put(intentKey, ruleIntent);
+            intentSynchronizer.submit(ruleIntent);
             networkStorage.compute(mscsId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
