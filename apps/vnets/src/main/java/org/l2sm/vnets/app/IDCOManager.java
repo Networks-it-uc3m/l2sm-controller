@@ -24,6 +24,7 @@ import org.onlab.packet.MacAddress;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.intentsync.IntentSynchronizationService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.device.DeviceService;
@@ -51,6 +52,7 @@ import org.onosproject.net.packet.PacketService;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.ConsistentMap;
 import org.onosproject.store.service.StorageService;
+import org.onosproject.store.service.Versioned;
 import org.onosproject.store.service.Serializer;
 
 import org.osgi.service.component.annotations.Activate;
@@ -97,11 +99,17 @@ public class IDCOManager implements IDCOService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected StorageService storageService;
+    
+    // @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    // protected IntentSynchronizationService intentSynchronizer;
+
+    // @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    // protected IntentService intentService;
 
     private ConsistentMap<String, Network> networkStorage;
     
     private ConsistentMap<ConnectPoint, Port> connectionPointStorage;
-
+    private ConsistentMap<Key, Intent> intentStorage;
     private ConsistentMap<MacCompositeKey, ConnectPoint> macStorage;
 
     private static class Port {
@@ -212,6 +220,12 @@ public class IDCOManager implements IDCOService {
             .build();
 
 
+        intentStorage = storageService.<Key, Intent>consistentMapBuilder()
+            .withName("intent-storage")            
+            .withApplicationId(appId)            
+            .withSerializer(Serializer.using(serializer.build()))            
+            .withPurgeOnUninstall()            
+            .build();
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -219,8 +233,8 @@ public class IDCOManager implements IDCOService {
         vnfLocationProvider = new VNFLocationProvider();
         packetService.addProcessor(vnfLocationProvider, PacketProcessor.advisor(1));
 
-        intentListener = new CustomIntentListener();
-        intentService.addListener(intentListener);
+        // intentListener = new CustomIntentListener();
+        // intentService.addListener(intentListener);
 
         genericEventHandler = Executors.newFixedThreadPool(4, groupedThreads("idco/event-handler", "worker-%d", log));
 
@@ -309,7 +323,14 @@ public class IDCOManager implements IDCOService {
         //         }
         //     });
         // });
-        intentSynchronizer.removeIntentsByAppId(appId);
+        intentService.getIntents().forEach(i -> {
+                log.info(i.toString());
+                if(i.appId() == appId) {
+                    intentService.withdraw(i);
+                    intentService.purge(i);
+                }
+            });
+        // intentSynchronizer.removeIntentsByAppId(appId);
         // intentSynchronizer.getIntents().forEach(i -> {
         //     log.info(i.toString());
         //     if(i.appId() == appId) {
@@ -355,7 +376,8 @@ public class IDCOManager implements IDCOService {
                 log.debug("erasing intent: ", intent);
         
                 if (intent != null) {
-                    intentSynchronizer.withdraw(intent.value());
+                    intentService.withdraw(intent.value());
+                    // intentSynchronizer.withdraw(intent.value());
                 }
             }); 
         }
@@ -430,7 +452,8 @@ public class IDCOManager implements IDCOService {
         if (intent != null) {
             log.info("Submitting new main intent for network " + networkId);
             intentStorage.put(intentKey, intent);
-            intentSynchronizer.submit(intent);
+            // intentSynchronizer.submit(intent);
+            intentService.submit(intent);
             log.info("Adding main intent to database for the network " + networkId);
             networkStorage.compute(networkId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
@@ -608,7 +631,8 @@ public class IDCOManager implements IDCOService {
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
             
             intentStorage.put(intentKey, ruleIntent);
-            intentSynchronizer.submit(ruleIntent);
+            // intentSynchronizer.submit(ruleIntent);
+            intentService.submit(ruleIntent);
             networkStorage.compute(mscsId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
