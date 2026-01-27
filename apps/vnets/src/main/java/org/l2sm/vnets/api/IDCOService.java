@@ -14,4 +14,8 @@ public interface IDCOService {
 
     public Network getVirtualNetwork(String networkId) throws IDCOServiceException;
 
+
+
+    public void deletePort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException;
+
 }

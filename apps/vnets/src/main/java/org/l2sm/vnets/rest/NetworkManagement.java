@@ -152,4 +152,31 @@ public class NetworkManagement extends AbstractWebResource {
             return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build();
         }
     }
+    /**
+     * Implementation of the Delete Port instruction
+     *
+     * @return 204 DELETED succesfully
+     */
+    @DELETE
+    @Path("/port")
+    @Consumes({ "application/yaml", MediaType.APPLICATION_JSON })
+    public Response deletePort(NetworkDTO networkDTO) {
+        String networkId = networkDTO.getNetworkId();
+        try {
+            networkDTO.getNetworkEndpoints().forEach(networkEndpoint -> {
+                try {
+                    idcoService.deletePort(networkId, ConnectPoint.deviceConnectPoint(networkEndpoint));
+                } catch (IDCOServiceException e) {
+                    throw new WebApplicationException(Response.status(Status.CONFLICT).build());
+                }
+            });
+            return Response.status(Status.OK).build();
+        } catch (WebApplicationException e) {
+            log.error("Error deleting port from network: " + networkId, e);
+            return e.getResponse();
+        } catch (Exception e) {
+            log.error("Unexpected error deleting port from network: " + networkId, e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build();
+        }
+    }
 }
