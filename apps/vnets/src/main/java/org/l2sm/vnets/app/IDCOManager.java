@@ -755,14 +755,13 @@ public class IDCOManager implements IDCOService {
         }).value();
         connectionPointStorage.remove(networkEndpoint);
 
-        log.info("Port " + networkEndpoint + " in network " + networkId + " removed from the database");
+        log.info("Port " + networkEndpoint + " in network " + network.toString() + " removed from the database");
 
-        addUpdatedIntent();
+        // addUpdatedIntent();
         log.info("Port " + networkEndpoint + " deleted from " + networkId);
           
-    }
+    }/*
     public void addUpdatedIntent(Network network) {
-        
         int size = network.getNetworkEndpoints().size();
 
         ConnectPoint[] netCps = new ConnectPoint[size];
@@ -795,14 +794,14 @@ public class IDCOManager implements IDCOService {
                     .build();
         }
         if (intent != null) {
-            log.info("Submitting new main intent for network " + networkId);
+            //log.info("Submitting new main intent for network " + networkId);
             intentStorage.put(intentKey, intent);
             // intentSynchronizer.submit(intent);
             intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkId);
-            networkStorage.compute(networkId, (key,oldNetwork) ->{
+            //log.info("Adding main intent to database for the network " + networkId);
+            // networkStorage.compute(networkId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
             });            
-        }
+        }*/
     }
