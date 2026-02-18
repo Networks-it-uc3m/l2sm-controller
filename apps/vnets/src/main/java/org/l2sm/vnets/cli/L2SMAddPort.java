@@ -4,6 +4,7 @@ import org.apache.karaf.shell.api.action.Argument;
 import org.apache.karaf.shell.api.action.Command;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.l2sm.vnets.api.IDCOService;
+import org.l2sm.vnets.api.IDCOServiceException;
 import org.onosproject.cli.AbstractShellCommand;
 import org.onosproject.net.ConnectPoint;
 
@@ -23,10 +24,11 @@ public class L2SMAddPort extends AbstractShellCommand {
         IDCOService idcoService = get(IDCOService.class);
         try {
             idcoService.addPort(networkId, ConnectPoint.deviceConnectPoint(networkEndpoint));
+            print("Port " + networkEndpoint + " added to network " + networkId + " successfully.");
+        } catch (IDCOServiceException e) {
+            print("Error adding port to network: " + e.getMessage());
         } catch (Exception e) {
-            print("Error ocurred");
-            print(e.toString());
+            print("Unexpected error occurred: " + e.toString());
         }
     }
-
 }

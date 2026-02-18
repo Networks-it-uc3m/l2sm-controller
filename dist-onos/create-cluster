@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Create Atomix cluster using Atomix docker image
+ATOMIX_IMAGE=atomix/atomix:3.1.12
+for i in {1..3}; do
+  echo "Setting up atomix-$i..."
+  docker container run --detach --name atomix-$i --hostname atomix-$i --restart=always -v ./config:/atomix $ATOMIX_IMAGE --config /atomix/atomix-$i.conf
+done
+
+# Create ONOS cluster using ONOS docker image
+ONOS_IMAGE=alexdecb/l2sm-controller:2.4
+for i in {1..3}; do
+    echo "Setting up onos-$i..."
+    docker container run --detach --name onos-$i --hostname onos-$i --restart=always $ONOS_IMAGE
+    docker exec -i onos-$i /bin/bash -c "mkdir config; cat > config/cluster.json" < ./config/cluster-$i.json
+    docker exec -it onos-$i bin/onos-user-password onos rocks >/dev/null 2>&1
+done
+
+function waitForStart() {
+    sleep 5
+    for i in {1..3}; do
+        echo "Waiting for onos-$i startup..."
+        ip=$(docker container inspect onos-$i | grep \"IPAddress\" | cut -d: -f2 | sort -u | tr -d ' " ,')
+        for l in {1..60}; do
+            curl --fail --silent --show-error http://$ip:8181/onos/v1/applications --user onos:rocks 1>/dev/null 2>&1 && break
+            sleep 1;
+        done
+        echo $ip summary >/dev/null 2>&1
+    done
+}
+
+# Extract the IP addresses of the ONOS nodes
+OC1=$(docker container inspect onos-1 | grep \"IPAddress\" | cut -d: -f2 | sort -u | tr -d ' " ,')
+OC2=$(docker container inspect onos-2 | grep \"IPAddress\" | cut -d: -f2 | sort -u | tr -d ' " ,')
+OC3=$(docker container inspect onos-3 | grep \"IPAddress\" | cut -d: -f2 | sort -u | tr -d ' " ,')
+ONOS_INSTANCES="$OC1 $OC2 $OC3"
+
+waitForStart
+
+# echo "Activating OpenFlow and ProxyARP applications..."
+# onos $OC1
+# onos $OC1 app activate org.onosproject.openflow proxyarp layout
