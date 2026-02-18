@@ -36,6 +36,7 @@
     <api.version>1.0.0</api.version>
     <onos.app.title>L2S-M Controller Vnets app.</onos.app.title>
     <onos.app.origin>UC3M</onos.app.origin>
+    <onos.app.requires>org.onosproject.drivers,org.onosproject.lldpprovider,org.onosproject.openflow-base,org.onosproject.optical-model</onos.app.requires>
     <onos.app.category>default</onos.app.category>
     <onos.app.url>https://github.com/Networks-it-uc3m</onos.app.url>
     <api.description>L2S-M Controller REST API to create or delete virtual networks</api.description>
@@ -165,6 +166,16 @@
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerArgs combine.self="override">
+            <arg>-Xlint:unchecked</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>
           <skip>true</skip>
@@ -194,6 +205,7 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
+        <version>5.1.9</version>
         <configuration>
           <instructions>
             <Karaf-Commands>org.l2sm.vnets.cli</Karaf-Commands>
@@ -208,6 +220,7 @@
   com.fasterxml.jackson.dataformat.yaml;version="[2.11.0,2.12)",
   *;resolution:=optional
 </Import-Package>
+            <_noimportjava>true</_noimportjava>
 
             <Web-ContextPath>${web.context}</Web-ContextPath>
             <!-- <Embed-Dependency>snakeyaml,jackson-dataformat-yaml</Embed-Dependency> -->
