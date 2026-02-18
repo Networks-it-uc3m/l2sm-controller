@@ -1,12 +1,12 @@
-FROM onosproject/onos:2.7-latest
+FROM alexdecb/onos:2.7-latest
 
 
 RUN apt-get update && \
     apt-get install -y wget ssh sshpass
     
-COPY ./src/controller ./
+COPY ./apps/vnets/target/vnets-app-1.0.oar .
 
-RUN chmod +x ./setup_controller.sh && \
-    chmod +x ./onos_critique.sh
+COPY ./scripts/setup_controller.sh .
+RUN chmod +x ./setup_controller.sh 
 
 ENTRYPOINT ["./setup_controller.sh"]

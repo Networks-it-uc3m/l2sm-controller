@@ -62,7 +62,3 @@ class MyTaskSet(SequentialTaskSet):
 class MyUser(HttpUser):
     wait_time = between(1, 5)  # Random wait time between requests (in seconds)
     tasks = [MyTaskSet]
-
-if __name__ == "__main__":
-    import os
-    os.system("locust -f locustfile.py")
