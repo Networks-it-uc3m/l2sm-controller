@@ -418,8 +418,14 @@ public class IDCOManager implements IDCOService {
 
         log.info("Port " + networkEndpoint + " in network " + networkId + " added to the database");
 
-        int size = network.getNetworkEndpoints().size();
+        reconcileNetworkIntent(network);
+        log.info("Port " + networkEndpoint + " correctly added to " + networkId);
+          
+    }
+private void reconcileNetworkIntent(Network network) {
 
+        int size = network.getNetworkEndpoints().size();
+        String networkId = network.getNetworkId();
         ConnectPoint[] netCps = new ConnectPoint[size];
         network.getNetworkEndpoints().toArray(netCps);
         long[] ids = Longs.toArray(network.getIds());
@@ -427,8 +433,15 @@ public class IDCOManager implements IDCOService {
         Intent intent = null;
         Key intentKey = Key.of("idco-main-" + networkId, appId);
         log.info("Creating main intent for network " + networkId);
-        if (size == 1) {
+        if (size <= 1) {
             log.info("Network has only one port, no intent is created");
+           Intent existingIntent = intentService.getIntent(intentKey);
+           if (existingIntent != null ) {
+               intentStorage.remove(intentKey);
+            intentService.withdraw(existingIntent);
+           }
+           return;
+
         } else if (size == 2) {
             log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
             intent = VirtualLinkIntent.builder()
@@ -449,18 +462,45 @@ public class IDCOManager implements IDCOService {
                     .tunnelIDs(ids)
                     .build();
         }
-        if (intent != null) {
-            log.info("Submitting new main intent for network " + networkId);
-            intentStorage.put(intentKey, intent);
-            // intentSynchronizer.submit(intent);
-            intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkId);
-            networkStorage.compute(networkId, (key,oldNetwork) ->{
-                oldNetwork.getIntents().add(intentKey);
-                return oldNetwork;
-            });            
+        log.info("Adding main intent to database for the network " + networkId);
+        intentStorage.put(intentKey, intent);
+        log.info("Submitting new main intent for network " + networkId);
+        // intentSynchronizer.submit(intent);
+        networkStorage.compute(networkId, (key,oldNetwork) ->{
+            oldNetwork.getIntents().add(intentKey);
+            return oldNetwork;
+        });            
+}
+    @Override
+    public void deletePort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
+
+        log.info("Deleting port " + networkEndpoint.toString() + " from network " + networkId);
+        if (!networkStorage.containsKey(networkId)) {
+            throw new IDCOServiceException("The network does not exist");
         }
-        log.info("Port " + networkEndpoint + " correctly added to " + networkId);
+
+    
+        Port port = connectionPointStorage.get(networkEndpoint).value();
+        Long tunnelId = port.getTunnelId();
+        log.info("Deleting port " + networkEndpoint + " from network " + networkId + " from the database");
+        Key intentKey = Key.of("idco-main-" + networkId, appId);
+        Intent existingIntent = intentStorage.get(intentKey).value();
+        
+        intentService.purge(existingIntent);
+
+        Network network = networkStorage.compute(networkId, (key,oldNetwork) ->{
+            oldNetwork.networkEndpoints.remove(networkEndpoint);
+            oldNetwork.tunnelIds.remove(tunnelId);
+            oldNetwork.getIntents().remove(intentKey);
+            return oldNetwork;
+        }).value();
+        connectionPointStorage.remove(networkEndpoint);
+
+        log.info("Port " + networkEndpoint + " in network " + network.toString() + " removed from the database");
+
+        reconcileNetworkIntent(network);
+        // addUpdatedIntent();
+        log.info("Port " + networkEndpoint + " deleted from " + networkId);
           
     }
 
@@ -735,73 +775,4 @@ public class IDCOManager implements IDCOService {
             }
         }
     }
-
-    @Override
-    public void deletePort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
-
-        log.info("Deleting port " + networkEndpoint.toString() + " from network " + networkId);
-        if (!networkStorage.containsKey(networkId)) {
-            throw new IDCOServiceException("The network does not exist");
-        }
-
-    
-        Port port = connectionPointStorage.get(networkEndpoint).value();
-        Long tunnelId = port.getTunnelId();
-        log.info("Deleting port " + networkEndpoint + " from network " + networkId + " from the database");
-        Network network = networkStorage.compute(networkId, (key,oldNetwork) ->{
-            oldNetwork.networkEndpoints.remove(networkEndpoint);
-            oldNetwork.tunnelIds.remove(tunnelId);
-            return oldNetwork;
-        }).value();
-        connectionPointStorage.remove(networkEndpoint);
-
-        log.info("Port " + networkEndpoint + " in network " + network.toString() + " removed from the database");
-
-        // addUpdatedIntent();
-        log.info("Port " + networkEndpoint + " deleted from " + networkId);
-          
-    }/*
-    public void addUpdatedIntent(Network network) {
-        int size = network.getNetworkEndpoints().size();
-
-        ConnectPoint[] netCps = new ConnectPoint[size];
-        network.getNetworkEndpoints().toArray(netCps);
-        long[] ids = Longs.toArray(network.getIds());
-
-        Intent intent = null;
-        Key intentKey = Key.of("idco-main-" + network.getNetworkId(), appId);
-        log.info("Updating main intent for network " + network.getNetworkId());
-        if (size == 1) {
-            log.info("Network has only one port, no intent is created");
-        } else if (size == 2) {
-            log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
-            intent = VirtualLinkIntent.builder()
-                    .key(intentKey)
-                    .appId(appId)
-                    .one(netCps[0])
-                    .two(netCps[1])
-                    .priority(VIRTUAL_LINK_PRIORITY)
-                    .tunnelID(ids[0])
-                    .build();
-        } else {
-            log.info("Creating virtual network intent");
-            intent = VirtualNetworkIntent.builder()
-                    .key(intentKey)
-                    .appId(appId)
-                    .connectPoints(netCps)
-                    .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
-                    .tunnelIDs(ids)
-                    .build();
-        }
-        if (intent != null) {
-            //log.info("Submitting new main intent for network " + networkId);
-            intentStorage.put(intentKey, intent);
-            // intentSynchronizer.submit(intent);
-            intentService.submit(intent);
-            //log.info("Adding main intent to database for the network " + networkId);
-            // networkStorage.compute(networkId, (key,oldNetwork) ->{
-                oldNetwork.getIntents().add(intentKey);
-                return oldNetwork;
-            });            
-        }*/
-    }
+}
