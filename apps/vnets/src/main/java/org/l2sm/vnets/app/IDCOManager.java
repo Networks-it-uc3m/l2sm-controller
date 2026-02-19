@@ -437,10 +437,10 @@ private void reconcileNetworkIntent(Network network) {
             log.info("Network has only one port, no intent is created");
            Intent existingIntent = intentService.getIntent(intentKey);
            if (existingIntent != null ) {
-               intentStorage.remove(intentKey);
             intentService.withdraw(existingIntent);
            }
            return;
+
 
         } else if (size == 2) {
             log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
@@ -463,9 +463,9 @@ private void reconcileNetworkIntent(Network network) {
                     .build();
         }
         log.info("Adding main intent to database for the network " + networkId);
-        intentStorage.put(intentKey, intent);
         log.info("Submitting new main intent for network " + networkId);
         // intentSynchronizer.submit(intent);
+        intentService.submit(intent);
         networkStorage.compute(networkId, (key,oldNetwork) ->{
             oldNetwork.getIntents().add(intentKey);
             return oldNetwork;
