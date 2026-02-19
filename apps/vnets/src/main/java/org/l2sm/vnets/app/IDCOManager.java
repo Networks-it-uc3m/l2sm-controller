@@ -418,8 +418,14 @@ public class IDCOManager implements IDCOService {
 
         log.info("Port " + networkEndpoint + " in network " + networkId + " added to the database");
 
-        int size = network.getNetworkEndpoints().size();
+        reconcileNetworkIntent(network);
+        log.info("Port " + networkEndpoint + " correctly added to " + networkId);
+          
+    }
+private void reconcileNetworkIntent(Network network) {
 
+        int size = network.getNetworkEndpoints().size();
+        String networkId = network.getNetworkId();
         ConnectPoint[] netCps = new ConnectPoint[size];
         network.getNetworkEndpoints().toArray(netCps);
         long[] ids = Longs.toArray(network.getIds());
@@ -427,8 +433,15 @@ public class IDCOManager implements IDCOService {
         Intent intent = null;
         Key intentKey = Key.of("idco-main-" + networkId, appId);
         log.info("Creating main intent for network " + networkId);
-        if (size == 1) {
+        if (size <= 1) {
             log.info("Network has only one port, no intent is created");
+           Intent existingIntent = intentService.getIntent(intentKey);
+           if (existingIntent != null ) {
+               intentStorage.remove(intentKey);
+            intentService.withdraw(existingIntent);
+           }
+           return;
+
         } else if (size == 2) {
             log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
             intent = VirtualLinkIntent.builder()
@@ -449,12 +462,10 @@ public class IDCOManager implements IDCOService {
                     .tunnelIDs(ids)
                     .build();
         }
-        if (intent != null) {
+        log.info("Adding main intent to database for the network " + networkId);
+        intentStorage.put(intentKey, intent);
             log.info("Submitting new main intent for network " + networkId);
-            intentStorage.put(intentKey, intent);
             // intentSynchronizer.submit(intent);
-            intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkId);
             networkStorage.compute(networkId, (key,oldNetwork) ->{
                 oldNetwork.getIntents().add(intentKey);
                 return oldNetwork;
