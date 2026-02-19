@@ -109,7 +109,6 @@ public class IDCOManager implements IDCOService {
     private ConsistentMap<String, Network> networkStorage;
     
     private ConsistentMap<ConnectPoint, Port> connectionPointStorage;
-    private ConsistentMap<Key, Intent> intentStorage;
     private ConsistentMap<MacCompositeKey, ConnectPoint> macStorage;
 
     private static class Port {
@@ -220,12 +219,6 @@ public class IDCOManager implements IDCOService {
             .build();
 
 
-        intentStorage = storageService.<Key, Intent>consistentMapBuilder()
-            .withName("intent-storage")            
-            .withApplicationId(appId)            
-            .withSerializer(Serializer.using(serializer.build()))            
-            .withPurgeOnUninstall()            
-            .build();
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -371,12 +364,12 @@ public class IDCOManager implements IDCOService {
 
            network.getIntents().forEach(intentKey -> {
                 log.debug("intent key: ", intentKey);
-                Versioned<Intent> intent =  intentStorage.get(intentKey);
+                Intent intent = intentService.getIntent(intentKey);
 
                 log.debug("erasing intent: ", intent);
         
                 if (intent != null) {
-                    intentService.withdraw(intent.value());
+                    intentService.withdraw(intent);
                     // intentSynchronizer.withdraw(intent.value());
                 }
             }); 
@@ -490,7 +483,7 @@ private void reconcileNetworkIntent(Network network) {
         Long tunnelId = port.getTunnelId();
         log.info("Deleting port " + networkEndpoint + " from network " + networkId + " from the database");
         Key intentKey = Key.of("idco-main-" + networkId, appId);
-        Intent existingIntent = intentStorage.get(intentKey).value();
+        Intent existingIntent = intentService.getIntent(intentKey);
         
         intentService.purge(existingIntent);
 
@@ -676,7 +669,7 @@ private void reconcileNetworkIntent(Network network) {
             FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
             
-            intentStorage.put(intentKey, ruleIntent);
+            //intentStorage.put(intentKey, ruleIntent);
             // intentSynchronizer.submit(ruleIntent);
             intentService.submit(ruleIntent);
             networkStorage.compute(mscsId, (key,oldNetwork) ->{
