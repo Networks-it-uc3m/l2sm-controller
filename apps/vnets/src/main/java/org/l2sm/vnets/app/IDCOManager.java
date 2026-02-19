@@ -407,6 +407,12 @@ public class IDCOManager implements IDCOService {
             throw new IDCOServiceException("The network does not exist");
         }
 
+        Network existingNetwork = networkStorage.get(networkId).value();
+        if (existingNetwork.getNetworkEndpoints().contains(networkEndpoint)) {
+            log.info("Port " + networkEndpoint + " already exists in network " + networkId + "; skipping add");
+            return;
+        }
+
         Long tunnelId = tunnelIdProvider.getNewId();
         log.info("Adding port " + networkEndpoint + " to network " + networkId + " to the database");
         Network network = networkStorage.compute(networkId, (key,oldNetwork) ->{
