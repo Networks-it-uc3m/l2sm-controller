@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -20,11 +21,10 @@ import org.l2sm.vlinks.api.VLinkNetwork;
 import org.l2sm.vlinks.net.VLinkPathIntent;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MacAddress;
+import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
-import org.onosproject.net.Path;
-import org.onosproject.net.DefaultPath;
 import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.DefaultFlowRule;
@@ -48,6 +48,10 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
+import org.onosproject.store.serializers.KryoNamespaces;
+import org.onosproject.store.service.ConsistentMap;
+import org.onosproject.store.service.Serializer;
+import org.onosproject.store.service.StorageService;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -56,15 +60,12 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.primitives.Longs;
-
 @Component(immediate = true)
 @Service
 public class IDCOVLinkManager implements IDCOVLinkService {
 
     private static final int VIRTUAL_LINK_PRIORITY = PacketPriority.HIGH3.priorityValue();
     private static final PacketPriority ARP_TO_CONTROLLER_PRIORITY = PacketPriority.HIGH2;
-    private static final int VIRTUAL_NETWORK_CORE_PRIORITY = PacketPriority.HIGH1.priorityValue();
     private static final int VIRTUAL_NETWORK_EDGE_PRIORITY = PacketPriority.HIGH1.priorityValue();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -90,7 +91,13 @@ public class IDCOVLinkManager implements IDCOVLinkService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY)
     protected ObjectiveTrackerService objectiveTrackerService;
 
-    private IDCOVLinkDatabase database;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY)
+    protected StorageService storageService;
+
+    private ConsistentMap<String, VLinkNetwork> networkStorage;
+    private ConsistentMap<ConnectPoint, Port> connectionPointStorage;
+    private ConsistentMap<MacCompositeKey, ConnectPoint> macStorage;
+
     private TunnelIdProvider tunnelIdProvider;
 
     private ArpProxyPacketProcessor packetProcessor;
@@ -104,9 +111,36 @@ public class IDCOVLinkManager implements IDCOVLinkService {
     @Activate
     protected void activate() {
         log.info("Starting IDCO");
-        appId = coreService.registerApplication("org.l2sm.app");
+        appId = coreService.registerApplication("org.l2sm.vlinks.app");
 
-        this.database = new IDCOVLinkDatabase(log);
+        KryoNamespace.Builder serializer = KryoNamespace.newBuilder()
+                .register(KryoNamespaces.API)
+                .register(VLinkNetwork.class)
+                .register(VLinkPathIntent.class)
+                .register(ConnectPoint.class)
+                .register(MacCompositeKey.class)
+                .register(Port.class);
+
+        networkStorage = storageService.<String, VLinkNetwork>consistentMapBuilder()
+                .withName("vlinks-network-storage")
+                .withApplicationId(appId)
+                .withSerializer(Serializer.using(serializer.build()))
+                .withPurgeOnUninstall()
+                .build();
+
+        connectionPointStorage = storageService.<ConnectPoint, Port>consistentMapBuilder()
+                .withName("vlinks-connection-point-storage")
+                .withApplicationId(appId)
+                .withSerializer(Serializer.using(serializer.build()))
+                .withPurgeOnUninstall()
+                .build();
+
+        macStorage = storageService.<MacCompositeKey, ConnectPoint>consistentMapBuilder()
+                .withName("vlinks-mac-storage")
+                .withApplicationId(appId)
+                .withSerializer(Serializer.using(serializer.build()))
+                .withPurgeOnUninstall()
+                .build();
 
         packetProcessor = new ArpProxyPacketProcessor();
         packetService.addProcessor(packetProcessor, PacketProcessor.director(2));
@@ -120,11 +154,9 @@ public class IDCOVLinkManager implements IDCOVLinkService {
         genericEventHandler = Executors.newFixedThreadPool(4, groupedThreads("idco/event-handler", "worker-%d", log));
 
         vnfLocationProvider.requestIntercepts();
-
         tunnelIdProvider = new TunnelIdProvider();
 
         log.info("IDCO was started");
-
     }
 
     @Deactivate
@@ -137,53 +169,67 @@ public class IDCOVLinkManager implements IDCOVLinkService {
         packetService.removeProcessor(vnfLocationProvider);
 
         log.info("Shutting down the event handler");
-        genericEventHandler.shutdown();
         try {
-            genericEventHandler.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            log.error("Could not shutdown thread executors correctly");
+            genericEventHandler.shutdown();
+            if (!genericEventHandler.awaitTermination(60, TimeUnit.SECONDS)) {
+                genericEventHandler.shutdownNow();
+                if (!genericEventHandler.awaitTermination(60, TimeUnit.SECONDS)) {
+                    log.error("Executor did not terminate");
+                }
+            }
+        } catch (InterruptedException ie) {
+            genericEventHandler.shutdownNow();
+            Thread.currentThread().interrupt();
         }
 
         log.info("Withdrawing all the intents");
-        database.getAllIntents().forEach(intentKey -> {
-            Intent intent = intentService.getIntent(intentKey);
-            if (intentKey != null)
+        intentService.getIntents().forEach(intent -> {
+            if (intent.appId().equals(appId)) {
                 intentService.withdraw(intent);
+                intentService.purge(intent);
+            }
         });
 
         log.info("Clearing database");
-        database.cleanVLinkDatabases();
+        networkStorage.clear();
+        connectionPointStorage.clear();
+        macStorage.clear();
         intentService.removeListener(intentListener);
 
         log.info("IDCO has stopped");
     }
 
-    public void createVLinkNetwork(String networkVlinkId, ConnectPoint networkVlinkFromEndpoint, ConnectPoint networkVlinkToEndpoint, String[] vLinkPath) throws IDCOVLinkServiceException {
-        
+    @Override
+    public void createVLinkNetwork(String networkVlinkId, ConnectPoint networkVlinkFromEndpoint,
+                                   ConnectPoint networkVlinkToEndpoint, String[] vLinkPath)
+            throws IDCOVLinkServiceException {
+
         genericEventHandler.submit(() -> {
-            log.info("Creating network: " + networkVlinkId);
-            log.info("Adding new Path from " + networkVlinkFromEndpoint.toString() + " to " + networkVlinkToEndpoint.toString());
-            database.lockVLinkNetwork(networkVlinkId);
+            log.info("Creating network: {}", networkVlinkId);
+            if (networkStorage.containsKey(networkVlinkId)) {
+                log.warn("Network {} already exists", networkVlinkId);
+                return;
+            }
 
+            Long tunnelId = tunnelIdProvider.getNewId();
+            if (tunnelId == null) {
+                log.error("Unable to allocate tunnel id for network {}", networkVlinkId);
+                return;
+            }
 
-            log.info("Registering new network");
-            database.registerVLinkNetwork(networkVlinkId);
-            Long tunnelId = tunnelIdProvider.getNewId(); 
-            
-            log.info("Adding port " + networkVlinkFromEndpoint.toString() + " to network " + networkVlinkId + " to the database");
-            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkFromEndpoint, tunnelId);
-            log.info("Adding port " + networkVlinkToEndpoint.toString() + " to network " + networkVlinkId + " to the database");
-            database.addPortToVLinkNetwork(networkVlinkId, networkVlinkToEndpoint, tunnelId);
-            log.info("Ports added to the database");
+            VLinkNetwork network = new VLinkNetwork(networkVlinkId);
+            network.getVLinkNetworkEndpoints().add(networkVlinkFromEndpoint);
+            network.getVLinkNetworkEndpoints().add(networkVlinkToEndpoint);
+            network.getIds().add(tunnelId);
+            network.getIds().add(tunnelId);
+            networkStorage.put(networkVlinkId, network);
 
-            VLinkNetwork network = database.getVLinkNetwork(networkVlinkId);
-            long[] ids = Longs.toArray(network.getIds());
+            connectionPointStorage.put(networkVlinkFromEndpoint, new Port(networkVlinkId, tunnelId));
+            connectionPointStorage.put(networkVlinkToEndpoint, new Port(networkVlinkId, tunnelId));
 
-            Intent intent = null;
             Key intentKey = Key.of("idco-main-" + networkVlinkId, appId);
-            log.info("Creating main intent for network " + networkVlinkId);
-            intent = VLinkPathIntent.builder()
-                    .key(intentKey)  
+            Intent intent = VLinkPathIntent.builder()
+                    .key(intentKey)
                     .appId(appId)
                     .one(networkVlinkFromEndpoint)
                     .two(networkVlinkToEndpoint)
@@ -192,47 +238,54 @@ public class IDCOVLinkManager implements IDCOVLinkService {
                     .tunnelID(tunnelId)
                     .build();
 
-            log.info("Submitting new main intent for network " + networkVlinkId);
             intentService.submit(intent);
-            log.info("Adding main intent to database for the network " + networkVlinkId);
-            database.addMainIntent(networkVlinkId, intentKey);
-            database.unlockVLinkNetwork(networkVlinkId);
-            log.info("The network " + networkVlinkId + " from " + networkVlinkFromEndpoint + " to " + networkVlinkToEndpoint + " was correctly created");
-        });
-    }
-
-    public void deleteVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
-        genericEventHandler.submit(() -> {
-            log.info("Deleting network " + networkVlinkId);
-            database.lockVLinkNetwork(networkVlinkId);
-            Collection<Key> net_intent = database.getVLinkNetworkIntents(networkVlinkId);
-
-            log.info("Deleting intents for network " + networkVlinkId);
-            net_intent.forEach(intentKey -> {
-                Intent intent = intentService.getIntent(intentKey);
-                if (intent != null)
-                    intentService.withdraw(intent);
+            networkStorage.compute(networkVlinkId, (key, oldNetwork) -> {
+                oldNetwork.getIntents().add(intentKey);
+                return oldNetwork;
             });
 
-            log.info("Deleting network "+ networkVlinkId + "from the database");
-            database.deleteVLinkNetwork(networkVlinkId);
-
-            log.info("The network with id \"" + networkVlinkId + "\" has been deleted");
-            database.unlockVLinkNetwork(networkVlinkId);
+            log.info("The network {} from {} to {} was correctly created",
+                    networkVlinkId, networkVlinkFromEndpoint, networkVlinkToEndpoint);
         });
-
     }
 
+    @Override
+    public void deleteVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
+        genericEventHandler.submit(() -> {
+            log.info("Deleting network {}", networkVlinkId);
+            if (!networkStorage.containsKey(networkVlinkId)) {
+                log.info("Network {} does not exist", networkVlinkId);
+                return;
+            }
 
+            VLinkNetwork network = networkStorage.get(networkVlinkId).value();
+            network.getIntents().forEach(intentKey -> {
+                Intent intent = intentService.getIntent(intentKey);
+                if (intent != null) {
+                    intentService.withdraw(intent);
+                }
+            });
+
+            network.getVLinkNetworkEndpoints().forEach(connectionPointStorage::remove);
+
+            Set<MacCompositeKey> macKeysToRemove = macStorage.keySet().stream()
+                    .filter(k -> k.networkId.equals(networkVlinkId))
+                    .collect(Collectors.toSet());
+            macKeysToRemove.forEach(macStorage::remove);
+
+            networkStorage.remove(networkVlinkId);
+            log.info("The network with id \"{}\" has been deleted", networkVlinkId);
+        });
+    }
+
+    @Override
     public VLinkNetwork getVLinkNetwork(String networkVlinkId) throws IDCOVLinkServiceException {
-
         Future<VLinkNetwork> future = genericEventHandler.submit(() -> {
-            log.info("Retrieving network " + networkVlinkId);
-            database.lockVLinkNetwork(networkVlinkId);
-
-            VLinkNetwork network = database.getVLinkNetwork(networkVlinkId);
-            database.unlockVLinkNetwork(networkVlinkId);
-            return network;
+            log.info("Retrieving network {}", networkVlinkId);
+            if (!networkStorage.containsKey(networkVlinkId)) {
+                return null;
+            }
+            return networkStorage.get(networkVlinkId).value().clone();
         });
 
         try {
@@ -240,23 +293,16 @@ public class IDCOVLinkManager implements IDCOVLinkService {
         } catch (Exception e) {
             return null;
         }
-
     }
 
     class ArpProxyPacketProcessor implements PacketProcessor {
 
-        public ArpProxyPacketProcessor() {
-
-        }
-
         @Override
         public void process(PacketContext context) {
-
-            // Verify valid context
             if (context == null || context.isHandled()) {
                 return;
             }
-            // Verify valid Ethernet packet
+
             Ethernet eth = context.inPacket().parsed();
             if (eth == null) {
                 return;
@@ -266,35 +312,33 @@ public class IDCOVLinkManager implements IDCOVLinkService {
         }
 
         public void processPacketInternal(PacketContext context) {
-
             Ethernet eth = context.inPacket().parsed();
-
             MacAddress dstMac = eth.getDestinationMAC();
             ConnectPoint heardPort = context.inPacket().receivedFrom();
 
-            String mscsId = database.getVLinkNetworkIdForPort(heardPort);
-            if (mscsId == null) {
+            if (!connectionPointStorage.containsKey(heardPort)) {
                 return;
             }
 
-            database.lockVLinkNetwork(mscsId);
+            String mscsId = connectionPointStorage.get(heardPort).value().getNetworkId();
+            MacCompositeKey macKey = new MacCompositeKey(mscsId, dstMac);
 
-            if (!(dstMac.isBroadcast() || dstMac.isMulticast())) {
-                ConnectPoint hostLocation = database.getHostLocation(mscsId, dstMac);
-                if (hostLocation != null) {
-                    TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(hostLocation.port())
-                            .build();
-                    OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
-                            context.inPacket().unparsed());
-                    packetService.emit(outboundPacket);
-                    context.block();
-                    database.unlockVLinkNetwork(mscsId);
-                    return;
-                }
-
+            if (!(dstMac.isBroadcast() || dstMac.isMulticast()) && macStorage.containsKey(macKey)) {
+                ConnectPoint hostLocation = macStorage.get(macKey).value();
+                TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(hostLocation.port()).build();
+                OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
+                        context.inPacket().unparsed());
+                packetService.emit(outboundPacket);
+                context.block();
+                return;
             }
 
-            Collection<ConnectPoint> connectPoints = database.getPortsOfVLinkNetworkGivenPort(heardPort);
+            Collection<ConnectPoint> connectPoints = Collections.emptySet();
+            if (networkStorage.containsKey(mscsId)) {
+                connectPoints = networkStorage.get(mscsId).value().getVLinkNetworkEndpoints().stream()
+                        .filter(p -> !p.equals(heardPort))
+                        .collect(Collectors.toSet());
+            }
 
             connectPoints.forEach(point -> {
                 TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
@@ -304,45 +348,33 @@ public class IDCOVLinkManager implements IDCOVLinkService {
             });
 
             context.block();
-            log.info("Proxying packet for: " + dstMac.toString() + " in network " + mscsId.toString());
-            database.unlockVLinkNetwork(mscsId);
+            log.info("Proxying packet for: {} in network {}", dstMac, mscsId);
         }
-
     }
 
     private class VNFLocationProvider implements PacketProcessor {
 
-        /**
-         * Request packet intercepts.
-         */
         private void requestIntercepts() {
-            // Use ARP
-            TrafficSelector.Builder selector = DefaultTrafficSelector.builder()
-                    .matchEthType(Ethernet.TYPE_ARP);
+            TrafficSelector.Builder selector = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP);
             packetService.requestPackets(selector.build(), ARP_TO_CONTROLLER_PRIORITY, appId);
-
         }
 
-        /**
-         * Withdraw packet intercepts.
-         */
         private void withdrawIntercepts() {
-            TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-            selector.matchEthType(Ethernet.TYPE_ARP);
+            TrafficSelector.Builder selector = DefaultTrafficSelector.builder().matchEthType(Ethernet.TYPE_ARP);
             packetService.cancelPackets(selector.build(), ARP_TO_CONTROLLER_PRIORITY, appId);
         }
 
         @Override
         public void process(PacketContext context) {
-            // Verify valid context
             if (context == null) {
                 return;
             }
-            // Verify valid Ethernet packet
+
             Ethernet eth = context.inPacket().parsed();
             if (eth == null) {
                 return;
             }
+
             MacAddress srcMac = eth.getSourceMAC();
             if (srcMac.isBroadcast() || srcMac.isMulticast()) {
                 return;
@@ -353,75 +385,79 @@ public class IDCOVLinkManager implements IDCOVLinkService {
 
         private void processPacketInternal(PacketContext context) {
             Ethernet eth = context.inPacket().parsed();
-
             ConnectPoint heardOn = context.inPacket().receivedFrom();
 
-            // If this arrived on control port, bail out.
             if (heardOn.port().isLogical()) {
                 return;
             }
 
             MacAddress hostId = eth.getSourceMAC();
-
             if (eth.getEtherType() == Ethernet.TYPE_ARP) {
                 detectedHost(hostId, heardOn, context);
             }
         }
 
         public void detectedHost(MacAddress macAddress, ConnectPoint hostLocation, PacketContext context) {
-
-            String mscsId = database.getVLinkNetworkIdForPort(hostLocation);
-            if (mscsId == null) {
+            if (!connectionPointStorage.containsKey(hostLocation)) {
                 return;
             }
-            database.lockVLinkNetwork(mscsId);
-            log.info("New packet received: " + macAddress.toString() + " for network " + mscsId.toString());
 
-            ConnectPoint lastLocation = database.getHostLocation(mscsId, macAddress);
+            String mscsId = connectionPointStorage.get(hostLocation).value().getNetworkId();
+            log.info("New packet received: {} for network {}", macAddress, mscsId);
 
-            if (lastLocation != null) {
+            MacCompositeKey macKey = new MacCompositeKey(mscsId, macAddress);
+            if (macStorage.containsKey(macKey)) {
+                ConnectPoint lastLocation = macStorage.get(macKey).value();
                 if (!lastLocation.equals(hostLocation)) {
-                    log.warn("The host " + macAddress.toString() + " in network " + mscsId
-                            + " has changed its location. The system does not supporthost mobility");
+                    log.warn("The host {} in network {} has changed its location. Host mobility is not supported",
+                            macAddress, mscsId);
                 }
-                database.unlockVLinkNetwork(mscsId);
                 return;
             }
 
-            Long tunnelId = database.getTunnelIdOfPort(hostLocation);
+            Long tunnelId = connectionPointStorage.get(hostLocation).value().getTunnelId();
             if (tunnelId == null) {
                 context.block();
-                database.unlockVLinkNetwork(mscsId);
                 return;
             }
 
-            Collection<ConnectPoint> connectPoint = database.getPortsOfVLinkNetworkGivenPort(hostLocation);
+            Collection<ConnectPoint> connectPoints = Collections.emptySet();
+            if (networkStorage.containsKey(mscsId)) {
+                connectPoints = networkStorage.get(mscsId).value().getVLinkNetworkEndpoints().stream()
+                        .filter(p -> !p.equals(hostLocation))
+                        .collect(Collectors.toSet());
+            }
 
-            List<FlowRule> rules = connectPoint.stream()
+            List<FlowRule> rules = connectPoints.stream()
                     .map(point -> createRule(macAddress, hostLocation, point, tunnelId))
                     .collect(Collectors.toList());
 
-            Key key = generateHostIntentKey(macAddress, mscsId);
-
-            FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, key, rules,
+            Key intentKey = generateHostIntentKey(macAddress, mscsId);
+            FlowRuleIntent ruleIntent = new FlowRuleIntent(appId, intentKey, rules,
                     Collections.emptyList(), PathIntent.ProtectionType.PRIMARY, null);
 
             intentService.submit(ruleIntent);
-            database.addIntentToVLinkNetwork(mscsId, key);
-            database.setHostLocation(mscsId, macAddress, hostLocation);
-            database.unlockVLinkNetwork(mscsId);
+            networkStorage.compute(mscsId, (key, oldNetwork) -> {
+                oldNetwork.getIntents().add(intentKey);
+                return oldNetwork;
+            });
+            macStorage.put(macKey, hostLocation);
         }
 
         private FlowRule createRule(MacAddress address, ConnectPoint cp, ConnectPoint otherCp, long tunnelId) {
             TrafficTreatment treatment = DefaultTrafficTreatment.builder().setTunnelId(tunnelId).transition(1).build();
-            TrafficSelector selector = DefaultTrafficSelector.builder().matchEthDst(address).matchInPort(otherCp.port())
+            TrafficSelector selector = DefaultTrafficSelector.builder()
+                    .matchEthDst(address)
+                    .matchInPort(otherCp.port())
                     .build();
             return DefaultFlowRule.builder().fromApp(appId)
-                    .withPriority(VIRTUAL_NETWORK_EDGE_PRIORITY).withTreatment(treatment)
-                    .withSelector(selector).makePermanent().forDevice(otherCp.deviceId()).build();
-
+                    .withPriority(VIRTUAL_NETWORK_EDGE_PRIORITY)
+                    .withTreatment(treatment)
+                    .withSelector(selector)
+                    .makePermanent()
+                    .forDevice(otherCp.deviceId())
+                    .build();
         }
-
     }
 
     class CustomIntentListener implements IntentListener {
@@ -433,10 +469,9 @@ public class IDCOVLinkManager implements IDCOVLinkService {
 
         public void handleEvent(IntentEvent event) {
             Intent intent = event.subject();
-            log.info("Intent event: " + event.type().name());
+            log.info("Intent event: {}", event.type().name());
             switch (event.type()) {
                 case FAILED:
-                    // objectiveTrackerService.addTrackedResources(intent.key(), );
                     break;
                 case INSTALLED:
                     break;
@@ -446,69 +481,86 @@ public class IDCOVLinkManager implements IDCOVLinkService {
                 default:
                     break;
             }
-
         }
     }
 
-    /************ UTILS ***************************************/
-
     private Key generateHostIntentKey(MacAddress hostMac, String mscsId) {
-
-        return Key.of("idco-host-" + mscsId.toString() + "-" + hostMac.toString(), appId);
+        return Key.of("idco-host-" + mscsId + "-" + hostMac, appId);
     }
 
-    /*
-     * We are not focusing on security in this implementation. Future
-     * implementations
-     * will include a more secure Tunnel Id provider.
-     * TODO: check valid vxlan tunnels
-     */
     static class TunnelIdProvider {
-
-        /*
-         * Linear Congruent generator for 24 bit numbers
-         * The parameters c and a are chosen to make the period 2*24:
-         * - c is relatively prime to 2^24
-         * - 2 is a factor of a - 1
-         * - 4 is a factor of a - 1
-         * 
-         * TODO: generate this values dinamically
-         */
         private long c = 16777213;
         private long a = 258088 + 1;
         private long modulus = 16777216;
-        private long last_id;
+        private long lastId;
         private long count;
 
         public TunnelIdProvider() {
             IdGenerator generator = new IdGenerator();
-            this.last_id = generator.nextId();
+            this.lastId = generator.nextId();
             count = 0;
         }
 
         public Long getNewId() {
-            
-
-            long id;
             if (count == modulus) {
                 return null;
             }
-            id = last_id;
-            this.last_id = (last_id * a + c) % modulus;
-            count++;
 
+            long id = lastId;
+            this.lastId = (lastId * a + c) % modulus;
+            count++;
             return id;
         }
 
         private class IdGenerator extends SecureRandom {
-            public IdGenerator() {
-                super();
-            }
-
             public long nextId() {
                 return next(24);
             }
         }
     }
 
+    private static class Port {
+        private String networkId;
+        private Long tunnelId;
+
+        Port(String networkId, Long tunnelId) {
+            this.networkId = networkId;
+            this.tunnelId = tunnelId;
+        }
+
+        String getNetworkId() {
+            return networkId;
+        }
+
+        Long getTunnelId() {
+            return tunnelId;
+        }
+    }
+
+    private static class MacCompositeKey {
+        private final String networkId;
+        private final MacAddress mac;
+
+        MacCompositeKey(String networkId, MacAddress mac) {
+            this.networkId = networkId;
+            this.mac = mac;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(networkId, mac);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            MacCompositeKey other = (MacCompositeKey) obj;
+            return Objects.equals(networkId, other.networkId) && Objects.equals(mac, other.mac);
+        }
+    }
 }
