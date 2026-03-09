@@ -13,6 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang.ObjectUtils.Null;
 import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.l2sm.vnets.api.IDCOService;
 import org.l2sm.vnets.api.IDCOServiceException;
@@ -485,7 +486,11 @@ private void reconcileNetworkIntent(Network network) {
         Key intentKey = Key.of("idco-main-" + networkId, appId);
         Intent existingIntent = intentService.getIntent(intentKey);
         
-        intentService.purge(existingIntent);
+        if (existingIntent != null) {
+            intentService.purge(existingIntent);
+        } else {
+            log.info("there is no existing intent to remove");
+        }
 
         Network network = networkStorage.compute(networkId, (key,oldNetwork) ->{
             oldNetwork.networkEndpoints.remove(networkEndpoint);
@@ -494,6 +499,7 @@ private void reconcileNetworkIntent(Network network) {
             return oldNetwork;
         }).value();
         connectionPointStorage.remove(networkEndpoint);
+
 
         log.info("Port " + networkEndpoint + " in network " + network.toString() + " removed from the database");
 
