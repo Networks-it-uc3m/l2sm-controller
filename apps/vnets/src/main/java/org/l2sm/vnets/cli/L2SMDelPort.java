@@ -9,7 +9,7 @@ import org.onosproject.cli.AbstractShellCommand;
 import org.onosproject.net.ConnectPoint;
 
 @Service
-@Command(scope = "onos", name = "l2sm-del-port", description = "Add a port to an existing network")
+@Command(scope = "onos", name = "l2sm-del-port", description = "Delete port from an existing network")
 
 public class L2SMDelPort extends AbstractShellCommand {
 
@@ -24,9 +24,9 @@ public class L2SMDelPort extends AbstractShellCommand {
         IDCOService idcoService = get(IDCOService.class);
         try {
             idcoService.deletePort(networkId, ConnectPoint.deviceConnectPoint(networkEndpoint));
-            print("Port " + networkEndpoint + " added to network " + networkId + " successfully.");
+            print("Port " + networkEndpoint + " deleted from network " + networkId + " successfully.");
         } catch (IDCOServiceException e) {
-            print("Error adding port to network: " + e.getMessage());
+            print("Error deleting port from network: " + e.getMessage());
         } catch (Exception e) {
             print("Unexpected error occurred: " + e.toString());
         }
