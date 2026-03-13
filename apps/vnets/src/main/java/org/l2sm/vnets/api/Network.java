@@ -17,6 +17,7 @@ public class Network {
     public String networkId;
     public List<ConnectPoint> networkEndpoints;
     public List<Long> tunnelIds;
+    private ConnectPoint mirrorPort;
     private Set<Key> intents;
     
 
@@ -58,11 +59,20 @@ public class Network {
         return tunnelIds;
     }
 
+    public ConnectPoint getMirrorPort() {
+        return mirrorPort;
+    }
+
+    public void setMirrorPort(ConnectPoint mirrorPort) {
+        this.mirrorPort = mirrorPort;
+    }
+
     public Network clone(){
         Network newNetwork = new Network();
         newNetwork.networkId = networkId;
         newNetwork.networkEndpoints.addAll(networkEndpoints);
         newNetwork.tunnelIds.addAll(tunnelIds);
+        newNetwork.mirrorPort = mirrorPort;
         return newNetwork;
     }
 
@@ -77,6 +87,7 @@ public class Network {
         for (Long l: tunnelIds){
             buffer.append(" -" + l + "\n"); 
         }
+        buffer.append("Mirror Port: " + mirrorPort + "\n");
         return buffer.toString();
     }
 

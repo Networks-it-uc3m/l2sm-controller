@@ -94,7 +94,11 @@ public class NetworkManagement extends AbstractWebResource {
     @Consumes({ "application/yaml", MediaType.APPLICATION_JSON })
     public Response createNetwork(NetworkDTO networkDTO) {
         try {
-            idcoService.createVirtualNetwork(networkDTO.getNetworkId());
+            ConnectPoint mirrorPort = null;
+            if (networkDTO.getMirrorPort() != null && !networkDTO.getMirrorPort().trim().isEmpty()) {
+                mirrorPort = ConnectPoint.deviceConnectPoint(networkDTO.getMirrorPort());
+            }
+            idcoService.createVirtualNetwork(networkDTO.getNetworkId(), mirrorPort);
             return Response.status(Status.NO_CONTENT).build();
         } catch (IDCOServiceException e) {
             log.error("Error creating network: " + networkDTO.getNetworkId(), e);

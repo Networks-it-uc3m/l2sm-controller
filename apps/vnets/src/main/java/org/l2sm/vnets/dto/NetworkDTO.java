@@ -10,6 +10,8 @@ public class NetworkDTO {
 
     private ArrayList<Long> tunnelList;
 
+    private String mirrorPort;
+
     public String getNetworkId() {
         return networkId;
     }
@@ -32,6 +34,14 @@ public class NetworkDTO {
 
     public void setTunnelList(ArrayList<Long> tunnelList) {
         this.tunnelList = tunnelList;
+    }
+
+    public String getMirrorPort() {
+        return mirrorPort;
+    }
+
+    public void setMirrorPort(String mirrorPort) {
+        this.mirrorPort = mirrorPort;
     }
 
    
