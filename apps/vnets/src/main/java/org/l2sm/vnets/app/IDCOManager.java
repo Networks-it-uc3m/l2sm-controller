@@ -344,8 +344,10 @@ public class IDCOManager implements IDCOService {
         log.info("IDCO has stopped");
     }
 
-    public void createVirtualNetwork(String networkId) {
-        networkStorage.putIfAbsent(networkId,new Network(networkId));
+    public void createVirtualNetwork(String networkId, ConnectPoint mirrorPort) {
+        Network network = new Network(networkId);
+        network.setMirrorPort(mirrorPort);
+        networkStorage.putIfAbsent(networkId, network);
     }
 
    
@@ -402,6 +404,9 @@ public class IDCOManager implements IDCOService {
         }
 
         Network existingNetwork = networkStorage.get(networkId).value();
+        if (networkEndpoint.equals(existingNetwork.getMirrorPort())) {
+            throw new IDCOServiceException("The mirror port cannot be added as a regular endpoint");
+        }
         if (existingNetwork.getNetworkEndpoints().contains(networkEndpoint)) {
             log.info("Port " + networkEndpoint + " already exists in network " + networkId + "; skipping add");
             return;
@@ -426,6 +431,7 @@ private void reconcileNetworkIntent(Network network) {
 
         int size = network.getNetworkEndpoints().size();
         String networkId = network.getNetworkId();
+        ConnectPoint mirrorPort = network.getMirrorPort();
         ConnectPoint[] netCps = new ConnectPoint[size];
         network.getNetworkEndpoints().toArray(netCps);
         long[] ids = Longs.toArray(network.getIds());
@@ -433,7 +439,7 @@ private void reconcileNetworkIntent(Network network) {
         Intent intent = null;
         Key intentKey = Key.of("idco-main-" + networkId, appId);
         log.info("Creating main intent for network " + networkId);
-        if (size <= 1) {
+        if (size == 0 || (size == 1 && mirrorPort == null)) {
             log.info("Network has only one port, no intent is created");
            Intent existingIntent = intentService.getIntent(intentKey);
            if (existingIntent != null ) {
@@ -442,7 +448,7 @@ private void reconcileNetworkIntent(Network network) {
            return;
 
 
-        } else if (size == 2) {
+        } else if (size == 2 && mirrorPort == null) {
             log.info("Creating virtual link intent between points " + netCps[0] + " and " + netCps[1]);
             intent = VirtualLinkIntent.builder()
                     .key(intentKey)
@@ -460,6 +466,7 @@ private void reconcileNetworkIntent(Network network) {
                     .connectPoints(netCps)
                     .priority(VIRTUAL_NETWORK_CORE_PRIORITY)
                     .tunnelIDs(ids)
+                    .mirrorPort(mirrorPort)
                     .build();
         }
         log.info("Adding main intent to database for the network " + networkId);

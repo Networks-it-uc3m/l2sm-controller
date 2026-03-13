@@ -4,7 +4,11 @@ import org.onosproject.net.ConnectPoint;
 
 public interface IDCOService {
 
-    public void createVirtualNetwork(String networkId) throws IDCOServiceException;
+    public default void createVirtualNetwork(String networkId) throws IDCOServiceException {
+        createVirtualNetwork(networkId, null);
+    }
+
+    public void createVirtualNetwork(String networkId, ConnectPoint mirrorPort) throws IDCOServiceException;
 
 
 
