@@ -16,6 +16,7 @@ public class VirtualNetworkIntent extends Intent {
     // Protected so that the serializer is able to access them
     ConnectPoint[] connectPoints;
     long[] tunnelIds;
+    ConnectPoint mirrorPort;
 
     /**
      * Returns a new virtual link builder.
@@ -41,6 +42,7 @@ public class VirtualNetworkIntent extends Intent {
 
         ConnectPoint[] connectPoints;
         long[] tunnelIds;
+        ConnectPoint mirrorPort;
 
         private Builder() {
             // Hide constructor
@@ -86,6 +88,11 @@ public class VirtualNetworkIntent extends Intent {
             return this;
         }
 
+        public Builder mirrorPort(ConnectPoint mirrorPort) {
+            this.mirrorPort = mirrorPort;
+            return this;
+        }
+
         /**
          * Builds a virtual link intent from the accumulated parameters.
          *
@@ -97,6 +104,7 @@ public class VirtualNetworkIntent extends Intent {
                     key,
                     connectPoints,
                     tunnelIds,
+                    mirrorPort,
                     priority,
                     resourceGroup);
         }
@@ -110,6 +118,7 @@ public class VirtualNetworkIntent extends Intent {
             Key key,
             ConnectPoint[] connectPoints,
             long[] tunnelIds,
+            ConnectPoint mirrorPort,
             int priority,
             ResourceGroup resourceGroup) {
         super(appId,
@@ -120,6 +129,7 @@ public class VirtualNetworkIntent extends Intent {
 
         this.connectPoints = connectPoints;
         this.tunnelIds = tunnelIds;
+        this.mirrorPort = mirrorPort;
     }
 
     // Constructor for serializer.
@@ -128,6 +138,7 @@ public class VirtualNetworkIntent extends Intent {
         super();
         this.connectPoints = null;
         this.tunnelIds = null;
+        this.mirrorPort = null;
     }
 
     public ConnectPoint[] connectPoints() {
@@ -143,6 +154,10 @@ public class VirtualNetworkIntent extends Intent {
         return this.tunnelIds;
     }
 
+    public ConnectPoint mirrorPort() {
+        return this.mirrorPort;
+    }
+
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(getClass())
@@ -152,6 +167,7 @@ public class VirtualNetworkIntent extends Intent {
                 .add("priority", priority())
                 .add("resources", resources())
                 .add("tunnelIDs", tunnelIds())
+                .add("mirrorPort", mirrorPort())
                 .add("resourceGroup", resourceGroup())
                 .toString();
     }

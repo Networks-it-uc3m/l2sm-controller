@@ -91,7 +91,7 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                         ConnectPoint rootPoint = intent.connectPoints[i];
                         HashSet<NetworkResource> resources = new HashSet<>();
                         PointToMultipointNode rootNode = getPointToMultipointTree(rootPoint, intent.connectPoints,
-                                        resources);
+                                        intent.mirrorPort(), resources);
                         log.info(rootNode.toString());
                         intentsToInstall.addAll(generateTreeIntent(rootNode, intent, (intent.tunnelIds())[i], resources));
                 }
@@ -100,7 +100,7 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
         }
 
         private PointToMultipointNode getPointToMultipointTree(ConnectPoint rootPoint,
-                        ConnectPoint[] completePointsList, Set<NetworkResource> resources) {
+                        ConnectPoint[] completePointsList, ConnectPoint mirrorPort, Set<NetworkResource> resources) {
 
                 PointToMultipointNode rootNode = new PointToMultipointNode(rootPoint);
                 for (ConnectPoint dp : completePointsList) {
@@ -108,38 +108,47 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                                 continue;
                         }
 
-                        List<ConnectPoint> points = new ArrayList<>();
-                        if (!rootPoint.deviceId().equals(dp.deviceId())) {
-                                List<Link> pathLinks = calculatePathLinks(rootPoint.deviceId(), dp.deviceId());
-                                if (pathLinks == null) {
-                                        return null;
-                                }
-                                for (Link link : pathLinks) {
-                                        points.add(link.src());
-                                        points.add(link.dst());
-                                }
-                                resources.addAll(pathLinks);
-                        }
+                        addDestinationPath(rootNode, rootPoint, dp, resources);
+                }
 
-                        log.info("Añadiendo path al arbol");
-
-                        PointToMultipointNode currentNode = rootNode;
-
-                        // It will always be an even size
-                        assert (points.size() % 2 == 0);
-                        for (int i = 0; i < points.size(); i += 2) {
-                                ConnectPoint port = points.get(i);
-                                ConnectPoint nextPort = points.get(i + 1);
-                                PointToMultipointNode nextNode = null;
-                                if ((nextNode = currentNode.getChild(port)) == null) {
-                                        nextNode = currentNode.addChild(port, nextPort);
-                                }
-                                currentNode = nextNode;
-                        }
-                        currentNode.addChild(dp, null);
+                if (mirrorPort != null && !mirrorPort.equals(rootPoint)) {
+                        addDestinationPath(rootNode, rootPoint, mirrorPort, resources);
                 }
 
                 return rootNode;
+        }
+
+        private void addDestinationPath(PointToMultipointNode rootNode, ConnectPoint rootPoint, ConnectPoint destination,
+                        Set<NetworkResource> resources) {
+
+                List<ConnectPoint> points = new ArrayList<>();
+                if (!rootPoint.deviceId().equals(destination.deviceId())) {
+                        List<Link> pathLinks = calculatePathLinks(rootPoint.deviceId(), destination.deviceId());
+                        if (pathLinks == null) {
+                                return;
+                        }
+                        for (Link link : pathLinks) {
+                                points.add(link.src());
+                                points.add(link.dst());
+                        }
+                        resources.addAll(pathLinks);
+                }
+
+                log.info("Añadiendo path al arbol");
+
+                PointToMultipointNode currentNode = rootNode;
+
+                assert (points.size() % 2 == 0);
+                for (int i = 0; i < points.size(); i += 2) {
+                        ConnectPoint port = points.get(i);
+                        ConnectPoint nextPort = points.get(i + 1);
+                        PointToMultipointNode nextNode = null;
+                        if ((nextNode = currentNode.getChild(port)) == null) {
+                                nextNode = currentNode.addChild(port, nextPort);
+                        }
+                        currentNode = nextNode;
+                }
+                currentNode.addChild(destination, null);
         }
 
         private List<Link> calculatePathLinks(DeviceId id1, DeviceId id2) {
