@@ -43,12 +43,14 @@ public class VirtualNetworkIntentTest {
                 cp("of:0000000000000002/2")
         };
         long[] tunnels = new long[]{100L, 200L};
+        ConnectPoint mirrorPort = cp("of:0000000000000003/3");
 
         VirtualNetworkIntent intent = VirtualNetworkIntent.builder()
                 .appId(appId)
                 .key(Key.of("vn-1", appId))
                 .connectPoints(points)
                 .tunnelIDs(tunnels)
+                .mirrorPort(mirrorPort)
                 .priority(450)
                 .build();
 
@@ -56,6 +58,7 @@ public class VirtualNetworkIntentTest {
         assertEquals(450, intent.priority());
         assertArrayEquals(points, intent.connectPoints());
         assertArrayEquals(tunnels, intent.tunnelIds());
+        assertEquals(mirrorPort, intent.mirrorPort());
     }
 
     @Test
@@ -68,6 +71,7 @@ public class VirtualNetworkIntentTest {
 
         assertNull(intent.connectPoints());
         assertNull(intent.tunnelIds());
+        assertNull(intent.mirrorPort());
     }
 
     @Test
@@ -76,6 +80,7 @@ public class VirtualNetworkIntentTest {
 
         assertNull(intent.connectPoints());
         assertNull(intent.tunnelIds());
+        assertNull(intent.mirrorPort());
     }
 
     @Test
@@ -94,6 +99,7 @@ public class VirtualNetworkIntentTest {
         assertTrue(rendered.contains("key"));
         assertTrue(rendered.contains("priority"));
         assertTrue(rendered.contains("tunnelIDs"));
+        assertTrue(rendered.contains("mirrorPort"));
     }
 
     @Test

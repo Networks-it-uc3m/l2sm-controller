@@ -53,12 +53,14 @@ public class NetworkTest {
         network.getNetworkEndpoints().add(cp("of:0000000000000001/1"));
         network.getIds().add(101L);
         network.getIntents().add(Key.of("k1", appId()));
+        network.setMirrorPort(cp("of:0000000000000009/9"));
 
         Network cloned = network.clone();
 
         assertEquals("net-a", cloned.getNetworkId());
         assertEquals(1, cloned.getNetworkEndpoints().size());
         assertEquals(1, cloned.getIds().size());
+        assertEquals(cp("of:0000000000000009/9"), cloned.getMirrorPort());
         assertTrue(cloned.getIntents().isEmpty());
     }
 
@@ -94,14 +96,26 @@ public class NetworkTest {
         Network network = new Network("net-a");
         network.getNetworkEndpoints().add(cp("of:0000000000000001/1"));
         network.getIds().add(200L);
+        network.setMirrorPort(cp("of:0000000000000009/9"));
 
         String rendered = network.toString();
 
         assertTrue(rendered.contains("Id: net-a"));
         assertTrue(rendered.contains("Endpoints:"));
         assertTrue(rendered.contains("Tunnel Ids:"));
+        assertTrue(rendered.contains("Mirror Port:"));
         assertTrue(rendered.contains("of:0000000000000001/1"));
+        assertTrue(rendered.contains("of:0000000000000009/9"));
         assertTrue(rendered.contains("200"));
+    }
+
+    @Test
+    public void mirrorPortCanBeMutatedThroughSetter() {
+        Network network = new Network("net-a");
+
+        network.setMirrorPort(cp("of:0000000000000007/7"));
+
+        assertEquals(cp("of:0000000000000007/7"), network.getMirrorPort());
     }
 
     @Test

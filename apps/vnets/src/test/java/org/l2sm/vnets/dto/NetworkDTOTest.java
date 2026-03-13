@@ -16,6 +16,7 @@ public class NetworkDTOTest {
         assertNull(dto.getNetworkId());
         assertNull(dto.getNetworkEndpoints());
         assertNull(dto.getTunnelList());
+        assertNull(dto.getMirrorPort());
     }
 
     @Test
@@ -49,5 +50,14 @@ public class NetworkDTOTest {
 
         assertEquals(1, dto.getTunnelList().size());
         assertEquals(Long.valueOf(123L), dto.getTunnelList().get(0));
+    }
+
+    @Test
+    public void mirrorPortCanBeSetAndRead() {
+        NetworkDTO dto = new NetworkDTO();
+
+        dto.setMirrorPort("of:0000000000000001/9");
+
+        assertEquals("of:0000000000000001/9", dto.getMirrorPort());
     }
 }

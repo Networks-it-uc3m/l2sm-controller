@@ -32,7 +32,7 @@ public class ObjectProviderTest {
 
     @Test
     public void readFromJsonParsesNetworkDto() throws Exception {
-        String json = "{\"networkId\":\"net1\",\"networkEndpoints\":[\"of:0000000000000001/1\"],\"tunnelList\":[11]}";
+        String json = "{\"networkId\":\"net1\",\"networkEndpoints\":[\"of:0000000000000001/1\"],\"tunnelList\":[11],\"mirrorPort\":\"of:0000000000000009/9\"}";
 
         NetworkDTO dto = (NetworkDTO) provider.readFrom(asObjectClass(NetworkDTO.class), NetworkDTO.class,
                 new java.lang.annotation.Annotation[0], MediaType.APPLICATION_JSON_TYPE,
@@ -41,11 +41,12 @@ public class ObjectProviderTest {
         assertEquals("net1", dto.getNetworkId());
         assertEquals(1, dto.getNetworkEndpoints().size());
         assertEquals(Long.valueOf(11), dto.getTunnelList().get(0));
+        assertEquals("of:0000000000000009/9", dto.getMirrorPort());
     }
 
     @Test
     public void readFromYamlParsesNetworkDto() throws Exception {
-        String yaml = "networkId: net2\nnetworkEndpoints:\n  - of:0000000000000001/2\ntunnelList:\n  - 12\n";
+        String yaml = "networkId: net2\nnetworkEndpoints:\n  - of:0000000000000001/2\ntunnelList:\n  - 12\nmirrorPort: of:0000000000000009/9\n";
 
         NetworkDTO dto = (NetworkDTO) provider.readFrom(asObjectClass(NetworkDTO.class), NetworkDTO.class,
                 new java.lang.annotation.Annotation[0], new MediaType("application", "yaml"),
@@ -54,6 +55,7 @@ public class ObjectProviderTest {
         assertEquals("net2", dto.getNetworkId());
         assertEquals("of:0000000000000001/2", dto.getNetworkEndpoints().get(0));
         assertEquals(Long.valueOf(12), dto.getTunnelList().get(0));
+        assertEquals("of:0000000000000009/9", dto.getMirrorPort());
     }
 
     @Test
@@ -104,6 +106,7 @@ public class ObjectProviderTest {
         assertTrue(payload.contains("net-json"));
         assertTrue(payload.contains("networkEndpoints"));
         assertTrue(payload.contains("tunnelList"));
+        assertTrue(payload.contains("mirrorPort"));
     }
 
     @Test
@@ -117,6 +120,7 @@ public class ObjectProviderTest {
         String payload = out.toString(StandardCharsets.UTF_8.name());
         assertTrue(payload.contains("networkId: \"net-yaml\""));
         assertTrue(payload.contains("networkEndpoints"));
+        assertTrue(payload.contains("mirrorPort"));
     }
 
     @Test
@@ -147,6 +151,7 @@ public class ObjectProviderTest {
         assertEquals("net-roundtrip", parsed.getNetworkId());
         assertEquals("of:0000000000000009/9", parsed.getNetworkEndpoints().get(0));
         assertEquals(Long.valueOf(99), parsed.getTunnelList().get(0));
+        assertEquals("of:0000000000000010/10", parsed.getMirrorPort());
     }
 
     private static NetworkDTO dto(String id, String endpoint, long tunnel) {
@@ -158,6 +163,7 @@ public class ObjectProviderTest {
         ArrayList<Long> tunnels = new ArrayList<>();
         tunnels.add(tunnel);
         dto.setTunnelList(tunnels);
+        dto.setMirrorPort("of:0000000000000010/10");
         return dto;
     }
 
