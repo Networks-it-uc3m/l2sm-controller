@@ -5,6 +5,7 @@ import static org.onlab.util.Tools.groupedThreads;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -345,8 +346,7 @@ public class IDCOManager implements IDCOService {
     }
 
     public void createVirtualNetwork(String networkId, ConnectPoint mirrorPort) {
-        Network network = new Network(networkId);
-        network.setMirrorPort(mirrorPort);
+        Network network = new Network(networkId, mirrorPort);
         networkStorage.putIfAbsent(networkId, network);
     }
 
@@ -553,29 +553,32 @@ private void reconcileNetworkIntent(Network network) {
                 return;
             }
             String mscsId = connectionPointStorage.get(heardPort).value().getNetworkId();
+            Network network = networkStorage.containsKey(mscsId) ? networkStorage.get(mscsId).value() : null;
            
             MacCompositeKey macKey = new MacCompositeKey(mscsId,dstMac);
             if (!(dstMac.isBroadcast() || dstMac.isMulticast()) && macStorage.containsKey(macKey)) {
                 ConnectPoint hostLocation = macStorage.get(macKey).value();
-                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                        .setOutput(hostLocation.port())
-                        .build();
-                OutboundPacket outboundPacket = new DefaultOutboundPacket(hostLocation.deviceId(), treatment,
-                        context.inPacket().unparsed());
-                packetService.emit(outboundPacket);
+                emitPacket(hostLocation, context);
+                if (network != null && network.getMirrorPort() != null) {
+                    log.info("Mirroring proxied packet for {} to {}", dstMac, network.getMirrorPort());
+                    emitPacket(network.getMirrorPort(), context);
+                }
                 context.block();
                 return;
             }
 
             Collection<ConnectPoint> connectPoints = Collections.emptySet();
-            if(networkStorage.containsKey(mscsId)) {
-                connectPoints = networkStorage.get(mscsId).value().getNetworkEndpoints().stream().filter(p -> !p.equals(heardPort)).collect(Collectors.toSet());
+            if (network != null) {
+                Set<ConnectPoint> mirroredPoints = network.getNetworkEndpoints().stream()
+                        .filter(p -> !p.equals(heardPort))
+                        .collect(Collectors.toCollection(HashSet::new));
+                if (network.getMirrorPort() != null && !network.getMirrorPort().equals(heardPort)) {
+                    mirroredPoints.add(network.getMirrorPort());
+                }
+                connectPoints = mirroredPoints;
             }
             connectPoints.forEach(point -> {
-                TrafficTreatment treatment = DefaultTrafficTreatment.builder().setOutput(point.port()).build();
-                OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
-                        context.inPacket().unparsed());
-                packetService.emit(outboundPacket);
+                emitPacket(point, context);
             });
 
             context.block();
@@ -643,6 +646,7 @@ private void reconcileNetworkIntent(Network network) {
                 return;
             }
             String mscsId = connectionPointStorage.get(hostLocation).value().getNetworkId();
+            Network network = networkStorage.containsKey(mscsId) ? networkStorage.get(mscsId).value() : null;
 
             log.info("New packet received: " + macAddress.toString() + " for network " + mscsId);
 
@@ -665,6 +669,13 @@ private void reconcileNetworkIntent(Network network) {
 
             if (tunnelId == null) {
                 context.block();
+                return;
+            }
+
+            if (network != null && network.getMirrorPort() != null) {
+                log.info("Mirror port {} configured for network {}; skipping learned unicast shortcut for {}",
+                        network.getMirrorPort(), mscsId, macAddress);
+                macStorage.put(macKey, hostLocation);
                 return;
             }
 
@@ -705,6 +716,15 @@ private void reconcileNetworkIntent(Network network) {
                     .forDevice(otherCp.deviceId())
                     .build();
         }
+    }
+
+    private void emitPacket(ConnectPoint point, PacketContext context) {
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .setOutput(point.port())
+                .build();
+        OutboundPacket outboundPacket = new DefaultOutboundPacket(point.deviceId(), treatment,
+                context.inPacket().unparsed());
+        packetService.emit(outboundPacket);
     }
 
     class CustomIntentListener implements IntentListener {

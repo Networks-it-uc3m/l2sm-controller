@@ -29,12 +29,15 @@ public class Network {
     }
 
     public Network(String networkId) {
+        this(networkId, null);
+    }
 
+    public Network(String networkId, ConnectPoint mirrorPort) {
         this.networkId = networkId;
+        this.mirrorPort = mirrorPort;
         this.networkEndpoints = new ArrayList<>();
         this.tunnelIds = new ArrayList<>();
         this.intents = new  HashSet<>();
-
     }
 
 
