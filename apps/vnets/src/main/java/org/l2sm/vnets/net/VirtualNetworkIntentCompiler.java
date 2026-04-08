@@ -90,6 +90,8 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                 for (int i = 0; i < intent.connectPoints.length; i++) {
                         ConnectPoint rootPoint = intent.connectPoints[i];
                         HashSet<NetworkResource> resources = new HashSet<>();
+                        log.info("Building point-to-multipoint tree for root {} with mirror port {}",
+                                        rootPoint, intent.mirrorPort());
                         PointToMultipointNode rootNode = getPointToMultipointTree(rootPoint, intent.connectPoints,
                                         intent.mirrorPort(), resources);
                         log.info(rootNode.toString());
@@ -112,6 +114,7 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                 }
 
                 if (mirrorPort != null && !mirrorPort.equals(rootPoint)) {
+                        log.info("Adding mirror destination path from root {} to mirror {}", rootPoint, mirrorPort);
                         addDestinationPath(rootNode, rootPoint, mirrorPort, resources);
                 }
 
@@ -122,12 +125,17 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                         Set<NetworkResource> resources) {
 
                 List<ConnectPoint> points = new ArrayList<>();
+                log.info("Resolving destination path from {} to {}", rootPoint, destination);
                 if (!rootPoint.deviceId().equals(destination.deviceId())) {
                         List<Link> pathLinks = calculatePathLinks(rootPoint.deviceId(), destination.deviceId());
                         if (pathLinks == null) {
+                                log.info("No path found from {} to {}", rootPoint.deviceId(), destination.deviceId());
                                 return;
                         }
+                        log.info("Calculated {} inter-device links from {} to {}", pathLinks.size(), rootPoint.deviceId(),
+                                        destination.deviceId());
                         for (Link link : pathLinks) {
+                                log.info("Path link {} -> {}", link.src(), link.dst());
                                 points.add(link.src());
                                 points.add(link.dst());
                         }
@@ -187,6 +195,7 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
 
                 DeviceId deviceId = node.getRootPort().deviceId();
                 PortNumber rootPort = node.getRootPort().port();
+                List<String> childOutputs = new ArrayList<>();
 
                 TrafficTreatment convergencePortTreatment = portTreatment(rootPort, isFirst ? null : tunnelId);
 
@@ -222,10 +231,14 @@ public class VirtualNetworkIntentCompiler implements IntentCompiler<VirtualNetwo
                 node.getChildren().entrySet().stream().forEach((e) -> {
                         ConnectPoint port = e.getKey();
                         PointToMultipointNode nextNode = e.getValue();
+                        childOutputs.add(String.format("%s%s", port, nextNode == null ? " [final]" : " [transit]"));
                         NextTreatment nextTreatment = DefaultNextTreatment
                                         .of(portTreatment(port.port(), nextNode == null ? null : tunnelId));
                         nextObjectiveBuilder.addTreatment(nextTreatment);
                 });
+
+                log.info("Installing broadcast next objective on device {} for ingress {} with outputs {}",
+                                deviceId, node.getRootPort(), childOutputs);
 
                 ForwardingObjective.Builder builder = DefaultForwardingObjective.builder().fromApp(appId)
                                 .makePermanent().withFlag(Flag.SPECIFIC).nextStep(nextId);
