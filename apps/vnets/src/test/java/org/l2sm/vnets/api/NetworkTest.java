@@ -36,6 +36,16 @@ public class NetworkTest {
     }
 
     @Test
+    public void constructorWithIdAndMirrorPortSetsBoth() {
+        ConnectPoint mirrorPort = cp("of:0000000000000009/9");
+
+        Network network = new Network("net-a", mirrorPort);
+
+        assertEquals("net-a", network.getNetworkId());
+        assertEquals(mirrorPort, network.getMirrorPort());
+    }
+
+    @Test
     public void setIntentsReplacesIntentSet() {
         Network network = new Network("net-a");
         Set<Key> intents = new HashSet<>();
