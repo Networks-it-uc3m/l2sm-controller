@@ -20,7 +20,7 @@ To install an oar file in ONOS, follow the official documentation. The easiest w
 The switches must be connected to the IDCO throught the OpenFlow 1.3 protocol. There is no specific requirement for the port names. The VXLAN tunnels must be created inside the OvSs with the options:key=flow option set (see example in https://docs.openvswitch.org/en/latest/faq/vxlan/).
 
 ## Usage
-This application currently provides 3 commands: l2sm-create-network, l2sm-add-port, l2sm-get-network and l2sm-delete-network. This commands must be executed in the ONOS karaf CLI.
+This application currently provides 5 commands: l2sm-create-network, l2sm-add-port, l2sm-add-mirroring-port, l2sm-get-network and l2sm-delete-network. This commands must be executed in the ONOS karaf CLI.
 
 #### Example of how it could be used with L2S-M
 L2SM notices a new network has been created called "austria" (new network attachment definition). Subsequently, it sends the create command to the IDCO. A new network with 0 points will be created:
@@ -43,7 +43,7 @@ Every time a new port is added to a network, the IDCO will make sure the needed 
 - The ports of the network can be either in the same or in different networks. It works the same
 
 #### Interface between the L2S-M and the IDCO
-How does L2S-M send commands to the IDCO? It could easily be done through the HTTP REST API. The code for it is not visible in this repository but could be easily added (it is pretty similar to the code in the original IDCO). This way, the L2S-M could execute the l2sm-create-network, l2sm-add-port, l2sm-get-network and l2sm-delete-network commands by sending small JSON files with the parameters to the IDCO through HTTP.
+How does L2S-M send commands to the IDCO? It can do it through the HTTP REST API exposed by this application. This way, the L2S-M can execute the l2sm-create-network, l2sm-add-port, l2sm-add-mirroring-port, l2sm-get-network and l2sm-delete-network operations by sending small JSON files with the parameters to the IDCO through HTTP. Mirror ports can be added or replaced with `POST /onos/vnets/api/mirror-port` by providing `networkId` and `mirrorPort`.
 
 
 ## Manual compilation (Optional)

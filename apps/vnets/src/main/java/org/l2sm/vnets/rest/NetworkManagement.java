@@ -156,6 +156,31 @@ public class NetworkManagement extends AbstractWebResource {
             return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build();
         }
     }
+
+    /**
+     * Implementation of the Add or Replace Mirroring Port instruction
+     *
+     * @return 204 NO CONTENT
+     */
+    @POST
+    @Path("/mirror-port")
+    @Consumes({ "application/yaml", MediaType.APPLICATION_JSON })
+    public Response createOrUpdateMirrorPort(NetworkDTO networkDTO) {
+        String networkId = networkDTO.getNetworkId();
+        try {
+            if (networkDTO.getMirrorPort() == null || networkDTO.getMirrorPort().trim().isEmpty()) {
+                return Response.status(Status.BAD_REQUEST).entity("mirrorPort is required").build();
+            }
+            idcoService.addMirroringPort(networkId, ConnectPoint.deviceConnectPoint(networkDTO.getMirrorPort()));
+            return Response.status(Status.NO_CONTENT).build();
+        } catch (IDCOServiceException e) {
+            log.error("Error configuring mirror port for network: " + networkId, e);
+            return Response.status(Status.CONFLICT).build();
+        } catch (Exception e) {
+            log.error("Unexpected error configuring mirror port for network: " + networkId, e);
+            return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build();
+        }
+    }
     /**
      * Implementation of the Delete Port instruction
      *
