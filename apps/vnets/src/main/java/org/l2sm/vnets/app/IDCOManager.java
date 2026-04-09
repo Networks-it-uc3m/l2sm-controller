@@ -427,6 +427,35 @@ public class IDCOManager implements IDCOService {
         log.info("Port " + networkEndpoint + " correctly added to " + networkId);
           
     }
+
+    @Override
+    public void addMirroringPort(String networkId, ConnectPoint mirrorPort) throws IDCOServiceException {
+        log.info("Configuring mirror port {} for network {}", mirrorPort, networkId);
+        if (!networkStorage.containsKey(networkId)) {
+            throw new IDCOServiceException("The network does not exist");
+        }
+
+        Network existingNetwork = networkStorage.get(networkId).value();
+        if (existingNetwork.getNetworkEndpoints().contains(mirrorPort)) {
+            throw new IDCOServiceException("A regular endpoint cannot be reused as mirror port");
+        }
+        if (mirrorPort.equals(existingNetwork.getMirrorPort())) {
+            log.info("Mirror port {} is already configured for network {}; skipping update", mirrorPort, networkId);
+            return;
+        }
+
+        withdrawMainIntent(networkId);
+        withdrawLearnedHostIntents(networkId, existingNetwork);
+
+        Network updatedNetwork = networkStorage.compute(networkId, (key, oldNetwork) -> {
+            oldNetwork.setMirrorPort(mirrorPort);
+            return oldNetwork;
+        }).value();
+
+        reconcileNetworkIntent(updatedNetwork);
+        log.info("Mirror port {} configured for network {}", mirrorPort, networkId);
+    }
+
 private void reconcileNetworkIntent(Network network) {
 
         int size = network.getNetworkEndpoints().size();
@@ -478,6 +507,40 @@ private void reconcileNetworkIntent(Network network) {
             return oldNetwork;
         });            
 }
+
+    private void withdrawMainIntent(String networkId) {
+        Key intentKey = Key.of("idco-main-" + networkId, appId);
+        Intent existingIntent = intentService.getIntent(intentKey);
+        if (existingIntent != null) {
+            intentService.purge(existingIntent);
+        }
+        networkStorage.computeIfPresent(networkId, (key, oldNetwork) -> {
+            oldNetwork.getIntents().remove(intentKey);
+            return oldNetwork;
+        });
+    }
+
+    private void withdrawLearnedHostIntents(String networkId, Network network) {
+        Set<Key> hostIntentKeys = network.getIntents().stream()
+                .filter(intentKey -> intentKey.toString().startsWith("idco-host-" + networkId + "-"))
+                .collect(Collectors.toSet());
+
+        hostIntentKeys.forEach(intentKey -> {
+            Intent intent = intentService.getIntent(intentKey);
+            if (intent != null) {
+                intentService.withdraw(intent);
+                intentService.purge(intent);
+            }
+        });
+
+        if (!hostIntentKeys.isEmpty()) {
+            networkStorage.computeIfPresent(networkId, (key, oldNetwork) -> {
+                oldNetwork.getIntents().removeAll(hostIntentKeys);
+                return oldNetwork;
+            });
+        }
+    }
+
     @Override
     public void deletePort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException {
 

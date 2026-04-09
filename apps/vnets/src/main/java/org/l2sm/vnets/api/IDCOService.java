@@ -16,6 +16,8 @@ public interface IDCOService {
 
     public void addPort(String networkId, ConnectPoint networkEndpoint) throws IDCOServiceException;
 
+    public void addMirroringPort(String networkId, ConnectPoint mirrorPort) throws IDCOServiceException;
+
     public Network getVirtualNetwork(String networkId) throws IDCOServiceException;
 
 
