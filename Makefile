@@ -1,3 +1,4 @@
+REPO ?= alexdecb
 IMAGE ?= l2sm-controller
 TAG ?= test
 DOCKER ?= docker
@@ -17,10 +18,10 @@ test:
 	$(MVN) test
 
 docker-build: install
-	$(DOCKER) build -t $(IMAGE):$(TAG) .
+	$(DOCKER) build -t $(REPO)/$(IMAGE):$(TAG) .
 
 docker-push: docker-build
-	$(DOCKER) push $(IMAGE):$(TAG)
+	$(DOCKER) push $(REPO)/$(IMAGE):$(TAG)
 
 clean:
 	$(MVN) clean
